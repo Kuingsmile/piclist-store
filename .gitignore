@@ -7,3 +7,4 @@ temp.js
 coverage/
 test.js
 test.db
+test_data/

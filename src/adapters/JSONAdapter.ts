@@ -1,40 +1,40 @@
-import { TextFileSync } from '@commonify/lowdb'
 import json from 'comment-json'
-import { IJSON } from 'src/types'
+import { TextFileSync } from 'lowdb/node'
 import writeFile from 'write-file-atomic'
+
+import { IJSON } from '../types'
+
 export class JSONAdapter {
   private readonly adapter: TextFileSync
   private readonly dbPath: string
-  constructor (dbPath: string) {
+
+  constructor(dbPath: string) {
     this.dbPath = dbPath
     this.adapter = new TextFileSync(dbPath)
   }
 
-  read (): IJSON {
+  read(): IJSON {
     const data = this.adapter.read()
-    /* istanbul ignore if */
     if (data === null) {
       return {}
-    } else {
+    }
+    try {
+      const res = json.parse(data || '{}')
+      if (res === null || typeof res !== 'object') {
+        return {}
+      }
+      return res as IJSON
+    } catch (e) {
       try {
-        // comment-json will break in some cases
-        const res = json.parse(data || '{}')
-        if (res === null || typeof res !== 'object') {
-          return {}
-        }
-        return res as IJSON
+        return JSON.parse(data)
       } catch (e) {
-        try {
-          return JSON.parse(data)
-        } catch (e) {
-          console.error('[PicGo store] JSON parse error', e)
-          return {}
-        }
+        console.error('[Store] JSON parse error', e)
+        return {}
       }
     }
   }
 
-  write (obj: any): void {
+  write(obj: any): void {
     writeFile.sync(this.dbPath, json.stringify(obj, null, 2))
   }
 }

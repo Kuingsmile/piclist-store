@@ -1,47 +1,72 @@
 import { IInsertData, IMetaInfoMode, IObject } from '../types'
 
-function metaInfoHelper (mode: IMetaInfoMode) {
-  return function (_target: any, _propertyKey: any, descriptor: PropertyDescriptor) {
-    const method = descriptor.value
-    descriptor.value = async function (...args: IInsertData) {
-      if (mode === IMetaInfoMode.createMany) {
-        args = args[0] as IObject[]
-        args = (args as IObject[]).map(item => metaInfoGenerator(item))
-        args = [args]
-      } else if (mode === IMetaInfoMode.create) {
-        args[0] = metaInfoGenerator(args[0] as IObject)
-      } else if (mode === IMetaInfoMode.updateMany) {
-        args = args[0] as IObject[]
-        args = (args as IObject[]).map(item => metaInfoUpdater(item))
-        args = [args]
-      } else {
-        metaInfoUpdater((args as [string, IObject])[1])
-      }
-      const result = await method.call(this, ...args)
+function metaInfoMethodWrapper(mode: IMetaInfoMode) {
+  return function (_target: any, _propertyKey: string, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.value
+
+    descriptor.value = async function (this: any, ...args: IInsertData) {
+      const transformedArgs = transformArgumentsByMode(mode, args)
+      const result = await originalMethod.call(this, ...transformedArgs)
       return result
     }
   }
 }
 
-// https://gist.github.com/LeverOne/1308368
-function uuid (a: any = '', b: any = ''): string { for (b = a = ''; a++ < 36; b += a * 51 & 52 ? (a ^ 15 ? 8 ^ Math.random() * (a ^ 20 ? 16 : 4) : 4).toString(16) : '-');return b }
+function transformArgumentsByMode(mode: IMetaInfoMode, args: IInsertData): IInsertData {
+  switch (mode) {
+    case IMetaInfoMode.createMany: {
+      const items = args[0] as IObject[]
+      const processedItems = items.map(item => generateMetaInfo(item))
+      return [processedItems]
+    }
 
-function metaInfoGenerator (value: IObject): IObject {
-  if (!value.id) {
-    value.id = uuid()
+    case IMetaInfoMode.create: {
+      const item = args[0] as IObject
+      return [generateMetaInfo(item)]
+    }
+
+    case IMetaInfoMode.updateMany: {
+      const items = args[0] as IObject[]
+      const processedItems = items.map(item => updateMetaInfo(item))
+      return [processedItems]
+    }
+
+    case IMetaInfoMode.update: {
+      const updateArgs = args as [string, IObject]
+      const [id, item] = updateArgs
+      return [id, updateMetaInfo(item)]
+    }
+
+    default:
+      return args
   }
-  if (!value.createdAt) {
-    value.createdAt = Date.now()
-    value.updatedAt = Date.now()
+}
+
+function generateUUID(a: any = '', b: any = ''): string {
+  for (
+    b = a = '';
+    a++ < 36;
+    b += (a * 51) & 52 ? (a ^ 15 ? 8 ^ (Math.random() * (a ^ 20 ? 16 : 4)) : 4).toString(16) : '-'
+  );
+  return b
+}
+
+function generateMetaInfo(value: IObject): IObject {
+  const now = Date.now()
+
+  return {
+    ...value,
+    id: value.id || generateUUID(),
+    createdAt: value.createdAt || now,
+    updatedAt: now
   }
-  return value
 }
 
-function metaInfoUpdater (value: IObject): IObject {
-  value.updatedAt = Date.now()
-  return value
+function updateMetaInfo(value: IObject): IObject {
+  return {
+    ...value,
+    updatedAt: Date.now()
+  }
 }
 
-export {
-  metaInfoHelper
-}
+export { metaInfoMethodWrapper }

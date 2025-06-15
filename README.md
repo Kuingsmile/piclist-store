@@ -1,228 +1,329 @@
-# PicGo/store
+# @piclist/store
 
-For PicGo projects to write & read data or configuration in disk.
+[![npm version](https://badge.fury.io/js/@piclist%2Fstore.svg)](https://badge.fury.io/js/@piclist%2Fstore)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[![Coverage Status](https://coveralls.io/repos/github/PicGo/store/badge.svg?branch=refs/heads/master)](https://coveralls.io/github/PicGo/store?branch=refs/heads/master) [![PicGo Convention](https://img.shields.io/badge/picgo-convention-blue.svg?style=flat-square)](https://github.com/PicGo/bump-version)
+A simple and efficient key-value store for PicList, supporting both JSON and binary data storage with built-in compression and metadata management.
 
-## Usage
+## ✨ Features
 
-```js
-import { DBStore } from '@picgo/store'
+- 🗄️ **Dual Storage Options**: JSON-based and binary database storage
+- 🔍 **Rich Query Interface**: Support for filtering, sorting, pagination
+- 📦 **Built-in Compression**: Zlib adapter for efficient storage
+- 🎯 **TypeScript Support**: Full type definitions included
+- ⚡ **Async/Await**: Modern promise-based API
+- 🔄 **Batch Operations**: Insert, update, and remove multiple items
+- 📝 **Auto Metadata**: Automatic timestamps and unique ID generation
 
-const db = new DBStore('path/to/your/xxx.db', 'collectionName')
+## 📦 Installation
 
-const main = async () => {
-  const result = await db.insert({
-    imgUrl: 'xxxx.jpg',
-  })
-  console.log(result)
-  // {
-  //   id: 'xxxxx',
-  //   imgUrl: 'xxx.jpg',
-  //   createdAt: 123123123123,
-  //   updatedAt: 123123123123
-  // }
-}
+```bash
+npm install @piclist/store
 ```
 
-## API Reference
+## 🚀 Quick Start
 
-For now, `@picgo/store` has two export member: `DBStore` & `JSONStore`.
+### DBStore (Binary Database)
+
+Perfect for storing large amounts of structured data with efficient querying capabilities.
+
+```typescript
+import { DBStore } from '@piclist/store'
+
+// Initialize database with collection
+const db = new DBStore('data.db', 'images')
+
+// Insert a single item
+const result = await db.insert({
+  imgUrl: 'https://example.com/image.jpg',
+  tags: ['nature', 'landscape'],
+  size: 1024
+})
+
+console.log(result)
+// {
+//   id: 'unique-uuid',
+//   imgUrl: 'https://example.com/image.jpg',
+//   tags: ['nature', 'landscape'],
+//   size: 1024,
+//   createdAt: 1671234567890,
+//   updatedAt: 1671234567890
+// }
+```
+
+### JSONStore (JSON Configuration)
+
+Ideal for configuration files and simple key-value storage.
+
+```typescript
+import { JSONStore } from '@piclist/store'
+
+// Initialize JSON store
+const config = new JSONStore('config.json')
+
+// Set configuration values
+config.set('theme', 'dark')
+config.set('language', 'en')
+config.write() // Persist to disk
+
+// Get configuration
+const theme = config.get('theme') // 'dark'
+```
+
+## 📚 API Reference
 
 ### DBStore
 
-- `new DBStore(dbPath: string, collectionName: string)`
+The main database class providing collection-based document storage.
 
-```js
-const db = new DBStore('picgo.db', 'uploadImgs')
+#### Constructor
+
+```typescript
+new DBStore(dbPath: string, collectionName: string)
 ```
 
-#### Get `.get(filter?: IFilter)`
+- `dbPath`: Path to the database file
+- `collectionName`: Name of the collection within the database
 
-- return: `Promise<IGetResult<IObject>[]>`
-- interface: [IGetResult](/src/types/index.ts)
+#### Methods
 
-To get the whole collection value.
+##### `.get(filter?: IFilter): Promise<IGetResult<T>>`
 
-```js
-async () => {
-  const collection = await db.get()
-  console.log(collection) // { total: x, data: [{...}, {...}, ...] }
+Retrieve items from the collection with optional filtering.
+
+```typescript
+// Get all items
+const all = await db.get()
+
+// Get with filtering and pagination
+const filtered = await db.get({
+  orderBy: 'desc',  // 'asc' | 'desc' - order by creation time
+  limit: 10,        // maximum number of items
+  offset: 0         // skip items (for pagination)
+})
+
+console.log(filtered)
+// { total: 100, data: [...] }
+```
+
+##### `.insert<T>(value: T): Promise<IResult<T>>`
+
+Insert a single item into the collection.
+
+```typescript
+const item = await db.insert({
+  title: 'My Image',
+  url: 'https://example.com/image.jpg'
+})
+```
+
+##### `.insertMany<T>(values: T[]): Promise<IResult<T>[]>`
+
+Insert multiple items in a single operation.
+
+```typescript
+const items = await db.insertMany([
+  { url: 'image1.jpg' },
+  { url: 'image2.jpg' },
+  { url: 'image3.jpg' }
+])
+```
+
+##### `.getById(id: string): Promise<IResult<T> | undefined>`
+
+Retrieve a specific item by its ID.
+
+```typescript
+const item = await db.getById('some-uuid')
+if (item) {
+  console.log(item.url)
 }
 ```
 
-To get filtered collection: (just like SQL `orderBy`, `limit` & `offset`)
+##### `.updateById(id: string, value: Partial<T>): Promise<boolean>`
 
-```js
-async () => {
-  const collection = await db.get({
-    orderBy: 'desc', // ['desc' | 'asc'] -> order with created-time
-    limit: 1, // limit >= 1
-    offset: 0, // offset >= 0
-  })
-  console.log(collection) // { total: 1, data: [{...}] }
+Update an existing item by ID. Returns `true` if successful, `false` if item not found.
+
+```typescript
+const success = await db.updateById('some-uuid', {
+  title: 'Updated Title'
+})
+```
+
+##### `.updateMany(items: IObject[]): Promise<{ total: number, success: number }>`
+
+Update multiple items by their IDs.
+
+```typescript
+const result = await db.updateMany([
+  { id: 'id1', title: 'New Title 1' },
+  { id: 'id2', title: 'New Title 2' }
+])
+
+console.log(result) // { total: 2, success: 2 }
+```
+
+##### `.removeById(id: string): Promise<void>`
+
+Remove an item by its ID.
+
+```typescript
+await db.removeById('some-uuid')
+```
+
+##### `.overwrite<T>(values: T[]): Promise<IResult<T>[]>`
+
+Replace the entire collection with new data.
+
+```typescript
+const newCollection = await db.overwrite([
+  { url: 'new1.jpg' },
+  { url: 'new2.jpg' }
+])
+```
+
+### JSONStore
+
+Simple JSON file-based key-value storage.
+
+#### Constructor
+
+```typescript
+new JSONStore(filePath: string)
+```
+
+#### Methods
+
+##### `.get(key: string, defaultValue?: any): any`
+
+Get a value by key.
+
+```typescript
+const value = config.get('theme', 'light')
+```
+
+##### `.set(key: string, value: any): void`
+
+Set a value for a key.
+
+```typescript
+config.set('theme', 'dark')
+```
+
+##### `.has(key: string): boolean`
+
+Check if a key exists.
+
+```typescript
+if (config.has('theme')) {
+  // Theme is configured
 }
 ```
 
-#### Insert `.insert<T>(value: T)`
+##### `.unset(key: string): void`
 
-- return: `Promise<IResult<T>>`
-- interface: [IResult](/src/types/index.ts)
+Remove a key and its value.
 
-To insert an item to collection.
-
-```js
-async () => {
-  const result = await db.insert({
-    imgUrl: 'https://xxxx.jpg'
-  })
-  console.log(result)
-  // {
-  //   id: string,
-  //   imgUrl: string,
-  //   createdAt: number,
-  //   updatedAt: number 
-  // }
-}
+```typescript
+config.unset('oldSetting')
 ```
 
-#### InsertMany `.insertMany<T>(value: T[])`
+##### `.read(flush?: boolean): IJSON`
 
-- return: `Promise<IResult<T>[]>`
-- interface: [IResult](/src/types/index.ts)
+Read data from file (automatically called on access).
 
-To insert multiple items to collection at once .
+##### `.write(): void`
 
-```js
-async () => {
-  const result = await db.insertMany([
-    {
-      imgUrl: 'https://xxxx.jpg'
-    },
-    {
-      imgUrl: 'https://yyyy.jpg'
-    }
-  ])
-  console.log(result)
-  // [{
-  //   id: string,
-  //   imgUrl: string,
-  //   createdAt: number,
-  //   updatedAt: number 
-  // },{
-  //   id: string,
-  //   imgUrl: string,
-  //   createdAt: number,
-  //   updatedAt: number 
-  // }]
-}
+Write current data to file.
+
+```typescript
+config.set('newKey', 'newValue')
+config.write() // Persist changes
 ```
 
-#### UpdateById `.updateById(id: string, value: IObject)`
+## 🔧 Advanced Usage
 
-- return: `Promise<boolean>`
-- interface: [IObject](/src/types/index.ts)
+### Custom Filtering
 
-To update an item by id. It will return `false` if the id does not exist.
+```typescript
+// Get recent items
+const recent = await db.get({
+  orderBy: 'desc',
+  limit: 5
+})
 
-```js
-async () => {
-  const result = await db.updateById('test-id', {
-    test: 123
-  })
-  console.log(result) // true
-}
+// Pagination
+const page2 = await db.get({
+  limit: 20,
+  offset: 20
+})
 ```
 
+### Batch Operations
 
-#### GetById `.getById(id: string)`
-
-- return: `Promise<IObject | undefined>`
-- interface: [IObject](/src/types/index.ts)
-
-To get an item by id.
-
-```js
-async () => {
-  const result = await db.getById('xxx')
-  console.log(result) // undefined
+```typescript
+// Bulk insert with error handling
+try {
+  const results = await db.insertMany(largeDataset)
+  console.log(`Inserted ${results.length} items`)
+} catch (error) {
+  console.error('Bulk insert failed:', error)
 }
+
+// Batch updates
+const updateResult = await db.updateMany([
+  { id: 'id1', status: 'processed' },
+  { id: 'id2', status: 'processed' },
+  { id: 'id3', status: 'failed' }
+])
+
+console.log(`Updated ${updateResult.success}/${updateResult.total} items`)
 ```
 
-#### RemoveById `.removeById(id: string)`;
+### Configuration Management
 
-- return: `Promise<void>`
+```typescript
+// Application settings
+const settings = new JSONStore('app-settings.json')
 
-To remove an item by id.
+// Default configuration
+settings.set('upload.maxSize', 10 * 1024 * 1024) // 10MB
+settings.set('upload.allowedTypes', ['jpg', 'png', 'gif'])
+settings.set('ui.theme', 'auto')
+settings.write()
 
-```js
-async () => {
-  const result = await db.removeById('xxx')
-  console.log(result) // undefined
-}
+// Runtime access
+const maxSize = settings.get('upload.maxSize')
+const theme = settings.get('ui.theme', 'light')
 ```
 
-#### Overwrite `.overwrite<T>(value: T[])` (v2.0.0)
+## 🎯 TypeScript Support
 
-- return: `Promise<IResult<T>[]>`
-- interface: [IResult](/src/types/index.ts)
+Full TypeScript definitions are included:
 
-To overwrite whole collection:
-
-```js
-async () => {
-  const result = await db.overwrite([
-    {
-      imgUrl: 'https://xxxx.jpg'
-    },
-    {
-      imgUrl: 'https://yyyy.jpg'
-    }
-  ])
-  console.log(result)
-  // [{
-  //   id: string,
-  //   imgUrl: string,
-  //   createdAt: number,
-  //   updatedAt: number 
-  // },{
-  //   id: string,
-  //   imgUrl: string,
-  //   createdAt: number,
-  //   updatedAt: number 
-  // }]
+```typescript
+interface ImageRecord {
+  url: string
+  title: string
+  tags: string[]
+  size: number
 }
+
+const db = new DBStore('images.db', 'uploads')
+const image = await db.insert<ImageRecord>({
+  url: 'https://example.com/photo.jpg',
+  title: 'Beautiful Sunset',
+  tags: ['sunset', 'nature'],
+  size: 2048576
+})
+
+// TypeScript knows the shape of `image`
+console.log(image.createdAt) // number
+console.log(image.tags)      // string[]
 ```
 
-#### UpdateMany `.updateMany(list: IObject[])` (v2.1.0)
-
-- return: `Promise<{ total: number, success: number }>`
-- interface: [IObject](/src/types/index.ts)
-
-To update many items by id:
-
-```js
-async () => {
-  const result = await db.updateMany([
-    {
-      id: 'xxx', // need to have id
-      imgUrl: 'https://xxxx.jpg'
-    },
-    {
-      id: 'yyy',
-      imgUrl: 'https://yyyy.jpg'
-    },
-    {
-      imgUrl: 'https://zzzz.jpg'
-    }
-  ])
-  console.log(result)
-  // { total: 3, success: 2 }
-}
-```
-
-## License
+## 📄 License
 
 [MIT](http://opensource.org/licenses/MIT)
 
-Copyright (c) 2020 Molunerfinn
+Copyright (c) 2025 Kuingsmile

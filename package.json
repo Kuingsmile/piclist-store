@@ -1,26 +1,38 @@
 {
-  "name": "@picgo/store",
+  "name": "@piclist/store",
   "version": "2.1.0",
-  "description": "",
+  "description": "A  simple and efficient key-value store for piclist, supporting JSON and binary data.",
   "main": "dist/index.js",
-  "typings": "dist/index.d.ts",
+  "module": "dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "dev": "rimraf ./dist/* && tsc -w -p .",
-    "build": "rimraf ./dist/* && rollup -c",
+    "test": "node ./test_db.js",
+    "dev": "rollup -c -w",
+    "clean": "rimraf dist",
+    "build": "rollup -c",
+    "prepublishOnly": "yarn run clean && yarn run build",
     "lint": "eslint src/**",
-    "test": "jest --coverage --runInBand",
+    "lint:fix": "eslint src/** --fix",
     "cz": "git-cz",
-    "release": "bump-version",
-    "cover": "cat ./coverage/lcov.info | coveralls"
+    "release": "bump-version"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Molunerfinn/typescript-node-template.git"
+    "url": "git+https://github.com/Kuingsmile/piclist-store.git"
   },
-  "author": "Molunerfinn",
+  "author": "Kuingsmile",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Molunerfinn/typescript-node-template/issues"
+    "url": "https://github.com/Kuingsmile/piclist-store/issues"
   },
   "husky": {
     "hooks": {
@@ -33,54 +45,41 @@
       "path": "./node_modules/cz-customizable"
     },
     "cz-customizable": {
-      "config": "./node_modules/@picgo/bump-version/.cz-config.js"
+      "config": "./node_modules/node-bump-version/.cz-config.cjs"
     }
   },
   "commitlint": {
     "extends": [
-      "./node_modules/@picgo/bump-version/commitlint-picgo"
+      "./node_modules/node-bump-version/dist/commitlint-node/index.js"
     ]
   },
-  "homepage": "https://github.com/Molunerfinn/typescript-node-template#readme",
+  "homepage": "https://github.com/Kuingsmile/piclist-store#readme",
   "devDependencies": {
-    "@commitlint/cli": "^8.3.5",
-    "@picgo/bump-version": "^1.0.3",
-    "@rollup/plugin-commonjs": "^22.0.2",
-    "@types/jest": "^24.9.0",
-    "@types/node": "^13.1.7",
-    "@types/write-file-atomic": "^4.0.0",
-    "@typescript-eslint/eslint-plugin": "5.33.1",
-    "commitizen": "^4.2.4",
-    "conventional-changelog": "^3.1.18",
-    "coveralls": "^3.0.9",
-    "cz-customizable": "^6.2.0",
-    "eslint": "8.22.0",
-    "eslint-config-standard-with-typescript": "^22.0.0",
-    "eslint-plugin-import": "2.26.0",
-    "eslint-plugin-n": "^15.2.4",
-    "eslint-plugin-node": "11.1.0",
-    "eslint-plugin-promise": "6.0.0",
-    "eslint-plugin-standard": "5.0.0",
-    "husky": "^4.0.10",
-    "jest": "^24.9.0",
-    "rimraf": "^3.0.2",
-    "rollup": "^2.78.1",
-    "rollup-plugin-node-resolve": "^5.2.0",
-    "rollup-plugin-terser": "^7.0.2",
-    "rollup-plugin-typescript2": "^0.33.0",
-    "ts-jest": "^24.3.0",
-    "typescript": "^4.7.4"
+    "@rollup/plugin-commonjs": "^28.0.3",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-typescript": "^12.1.2",
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^20.3.1",
+    "@types/write-file-atomic": "^4.0.3",
+    "@typescript-eslint/eslint-plugin": "8.34.0",
+    "eslint": "^9.29.0",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
+    "eslint-plugin-unicorn": "^59.0.1",
+    "node-bump-version": "^2.0.0",
+    "rimraf": "^6.0.1",
+    "rollup": "^4.43.0",
+    "rollup-plugin-dts": "^6.2.1",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.34.0"
   },
   "dependencies": {
-    "@commonify/lowdb": "^3.0.0",
-    "@commonify/steno": "^2.1.0",
-    "@types/bson": "^4.0.1",
-    "@types/graceful-fs": "^4.1.3",
-    "@types/lodash": "^4.14.182",
-    "comment-json": "^4.2.3",
-    "fflate": "^0.7.3",
+    "@types/lodash": "^4.17.17",
+    "comment-json": "^4.2.5",
+    "fflate": "^0.8.2",
+    "fs-extra": "^11.3.0",
     "lodash": "^4.17.21",
-    "lodash-id": "^0.14.0",
-    "write-file-atomic": "^4.0.1"
+    "lowdb": "^7.0.1",
+    "write-file-atomic": "^6.0.0"
   }
 }

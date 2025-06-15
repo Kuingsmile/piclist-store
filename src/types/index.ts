@@ -13,7 +13,7 @@ export interface IFilter {
 
 export interface IGetResult<T> {
   total: number
-  data: Array<IResult<T>>
+  data: IResult<T>[]
 }
 export interface IObject {
   id?: string

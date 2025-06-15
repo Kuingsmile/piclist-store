@@ -1,39 +1,43 @@
-import { terser } from 'rollup-plugin-terser'
-import typescript from 'rollup-plugin-typescript2'
 import commonjs from '@rollup/plugin-commonjs'
-// import resolve from 'rollup-plugin-node-resolve'
-export default {
-  input: './src/index.ts',
-  plugins: [
-    typescript({
-      tsconfigOverride: {
-        compilerOptions: {
-          target: 'ES2017',
-          module: 'ES2020'
-        },
-        exclude: [
-          'node_modules',
-          '**/*.test.ts',
-          '**/*.spec.ts'
-        ]
+import json from '@rollup/plugin-json'
+import { nodeResolve } from '@rollup/plugin-node-resolve'
+import typescript from '@rollup/plugin-typescript'
+import dts from 'rollup-plugin-dts'
+
+const external = ['write-file-atomic', 'lowdb', 'fflate', 'util', 'fs', 'lodash', 'comment-json']
+
+export default [
+  // Main library build
+  {
+    input: 'src/index.ts',
+    output: [
+      {
+        file: 'dist/index.js',
+        format: 'esm',
+        sourcemap: true,
+        exports: 'named'
       }
-    }),
-    commonjs(),
-    terser()
-  ],
-  output: [{
-    format: 'cjs',
-    file: 'dist/index.js',
-    sourcemap: 'inline'
-  }],
-  external: [
-    'write-file-atomic',
-    // '@commonify/steno',
-    '@commonify/lowdb',
-    'fflate',
-    'util',
-    'fs',
-    'lodash',
-    'comment-json'
-  ]
-}
+    ],
+    external,
+    plugins: [
+      nodeResolve({
+        preferBuiltins: true
+      }),
+      commonjs(),
+      json(),
+      typescript({
+        tsconfig: './tsconfig.json',
+        declaration: false
+      })
+    ]
+  },
+  // Type definitions
+  {
+    input: 'src/index.ts',
+    output: {
+      file: 'dist/index.d.ts',
+      format: 'esm'
+    },
+    plugins: [dts()]
+  }
+]
