@@ -2,7 +2,7 @@ export enum IDBStatus {
   inited = 'inited',
   loaded = 'loaded',
   started = 'started',
-  stopped = 'stopped'
+  stopped = 'stopped',
 }
 
 export interface IFilter {
@@ -26,7 +26,7 @@ export enum IMetaInfoMode {
   createMany,
   create,
   update,
-  updateMany
+  updateMany,
 }
 
 export type IResult<T> = T & {
@@ -35,13 +35,9 @@ export type IResult<T> = T & {
   updatedAt: number
 }
 
-export interface ILowData {
-  [propName: string]: IObject[] | ILowDataKeyMap
-}
+export type ILowData = Record<string, IObject[] | ILowDataKeyMap>
 
-export interface ILowDataKeyMap {
-  [id: string]: 1
-}
+export type ILowDataKeyMap = Record<string, 1>
 
 export interface IJSON {
   [propsName: string]: string | number | IJSON

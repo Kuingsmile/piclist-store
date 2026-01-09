@@ -97,7 +97,7 @@ test.test('DBStore - 插入多个数据', async () => {
 
   const users = [
     { name: 'Bob', age: 25 },
-    { name: 'Charlie', age: 35 }
+    { name: 'Charlie', age: 35 },
   ]
   const result = await store.insertMany(users)
 
@@ -110,7 +110,7 @@ test.test('DBStore - 查询数据', async () => {
 
   await store.insert([
     { name: 'David', age: 28 },
-    { name: 'Eve', age: 32 }
+    { name: 'Eve', age: 32 },
   ])
 
   const result = await store.get()

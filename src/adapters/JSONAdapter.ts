@@ -24,7 +24,7 @@ export class JSONAdapter {
         return {}
       }
       return res as IJSON
-    } catch (e) {
+    } catch (_e) {
       try {
         return JSON.parse(data)
       } catch (e) {
