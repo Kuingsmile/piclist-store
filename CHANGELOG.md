@@ -1,3 +1,9 @@
+##  (2026-01-09)
+
+* :arrow_up: Upgrade(custom): upgrade deps d0e60fe
+
+
+
 ##  (2025-06-15)
 
 * :sparkles: Feature(custom): migrate to esm 6ceb03b

@@ -1,6 +1,6 @@
 {
   "name": "@piclist/store",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "A  simple and efficient key-value store for piclist, supporting JSON and binary data.",
   "main": "dist/index.js",
   "module": "dist/index.js",
