@@ -15,29 +15,29 @@ export default [
         file: 'dist/index.js',
         format: 'esm',
         sourcemap: true,
-        exports: 'named'
-      }
+        exports: 'named',
+      },
     ],
     external,
     plugins: [
       nodeResolve({
-        preferBuiltins: true
+        preferBuiltins: true,
       }),
       commonjs(),
       json(),
       typescript({
         tsconfig: './tsconfig.json',
-        declaration: false
-      })
-    ]
+        declaration: false,
+      }),
+    ],
   },
   // Type definitions
   {
     input: 'src/index.ts',
     output: {
       file: 'dist/index.d.ts',
-      format: 'esm'
+      format: 'esm',
     },
-    plugins: [dts()]
-  }
+    plugins: [dts()],
+  },
 ]
