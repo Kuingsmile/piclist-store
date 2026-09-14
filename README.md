@@ -17,9 +17,16 @@ A simple and efficient key-value store for PicList, supporting both JSON and bin
 
 ## 📦 Installation
 
+Requires Node.js `^22.13.0 || >=24.0.0` (minimum: **22.13.0**; Node.js 23 is excluded).
+
 ```bash
 npm install @piclist/store
 ```
+
+Dependency updates retain `write-file-atomic` 7.x for this Node.js range,
+TypeScript 6.0.x for the supported `typescript-eslint` compiler API, and
+`rollup-plugin-dts` 6.4.x because 6.5.x pulls in Babel 8 with a higher Node.js minimum.
+Node.js type definitions follow the supported Node.js 22 major.
 
 ## 🚀 Quick Start
 

@@ -38,6 +38,8 @@ class SimpleTest {
 
     if (this.failed === 0) {
       console.log('🎉 所有测试通过!')
+    } else {
+      process.exitCode = 1
     }
   }
 }
@@ -226,13 +228,36 @@ test.test('JSONStore - 清空数据库', async () => {
   assertEquals(store.get('temp'), undefined, '清空后临时数据应该为undefined')
 })
 
+test.test('DBStore - compressed data survives reopening', async () => {
+  const file = path.join(TEST_DIR, 'roundtrip.db')
+  const store = new DBStore(file, 'items')
+  const inserted = await store.insert({ name: '持久化', nested: { enabled: true } })
+  const reopened = new DBStore(file, 'items')
+  assertEquals(await reopened.getById(inserted.id), inserted, 'Stored data should survive reopening')
+  assertEquals(reopened.errorList, [], 'Reading compressed data should not report errors')
+  const bytes = await fs.readFile(file)
+  assertEquals([...bytes.subarray(0, 2)], [0x1f, 0x8b], 'Binary store should remain gzip encoded')
+})
+
+test.test('JSONStore - comments survive updates and reopening', async () => {
+  const file = path.join(TEST_DIR, 'comments.json')
+  await fs.writeFile(file, '{\n  // Keep this comment\n  "name": "before"\n}\n')
+  const store = new JSONStore(file)
+  assertEquals(store.get('name'), 'before', 'JSON comments should parse')
+  store.set('name', 'after')
+  const reopened = new JSONStore(file)
+  assertEquals(reopened.get('name'), 'after', 'JSON updates should persist')
+  assert((await fs.readFile(file, 'utf8')).includes('// Keep this comment'), 'Comments should persist')
+})
+
 async function runTests() {
   try {
     await setupTest()
     await test.run()
   } catch (error) {
     console.error('测试运行失败:', error)
+    process.exitCode = 1
   }
 }
 
-runTests().catch(console.error)
+await runTests()
