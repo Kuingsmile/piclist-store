@@ -21,7 +21,7 @@ class DBStore {
     this.adapter = new ZlibAdapter(dbPath, collectionName, this.errorList)
     this.db = new Low<ILowData>(this.adapter, {
       [this.collectionName]: [],
-      [this.collectionKey]: {}
+      [this.collectionKey]: {},
     })
   }
 
@@ -53,7 +53,7 @@ class DBStore {
     }
     return {
       total,
-      data
+      data,
     }
   }
 
@@ -132,7 +132,7 @@ class DBStore {
     await this.db.write()
     return {
       success: successCount,
-      total: list.length
+      total: list.length,
     }
   }
 

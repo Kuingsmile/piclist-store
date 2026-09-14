@@ -1,34 +1,24 @@
 {
   "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "declaration": true,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "jsx": "preserve",
+    "lib": ["ScriptHost", "esnext", "DOM"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "target": "esnext",
-    "module": "esnext",
-    "strict": true,
-    "jsx": "preserve",
-    "importHelpers": true,
-    "moduleResolution": "bundler",
+    "outDir": "./dist",
     "resolveJsonModule": true,
-    "esModuleInterop": true,
-    "declaration": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "baseUrl": ".",
-    "outDir": "dist",
-    "typeRoots": [
-      "./node_modules/@types",
-      "./src/types/*",
-    ],
-    "lib": [
-      "ScriptHost",
-      "esnext",
-      "DOM"
-    ]
+    "rootDir": "./src",
+    "strict": true,
+    "target": "esnext",
+    "typeRoots": ["./node_modules/@types", "./src/types/*"],
+    "types": ["node"]
   },
-  "include": [
-    "src/**/*.ts",
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "exclude": ["node_modules"],
+  "include": ["./src/**/*.ts"]
 }
