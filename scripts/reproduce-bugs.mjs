@@ -532,6 +532,35 @@ test('03-write', async () => {
   return { schedule: 'Initial read held before publishing loaded data', memoryIds: memory, persistedIds: disk }
 })
 
+verify('02-db', async () => {
+  const p = file('corrupt.db')
+  const invalid = Buffer.from('synthetic-invalid-gzip')
+  await writeFile(p, invalid)
+  const db = new DBStore(p, 'items')
+  await assert.rejects(db.get())
+  await assert.rejects(db.insert({ id: 'new' }))
+  assert.deepEqual(await readFile(p), invalid)
+  // Repairing the file allows the same object to retry its failed initialization.
+  await seed('repair.db', [{ id: 'saved' }])
+  await writeFile(p, await readFile(file('repair.db')))
+  assert.equal((await db.get()).total, 1)
+  return { corruptFilePreserved: true, writesRejected: true, recoverySucceeded: true }
+})
+verify('02-json', async () => {
+  const p = file('corrupt.json')
+  const invalid = '{"saved":1,'
+  await writeFile(p, invalid)
+  assert.throws(() => new JSONStore(p), /Invalid JSON store/)
+  assert.equal(await readFile(p, 'utf8'), invalid)
+  const db = new JSONStore(file('refresh.json'))
+  db.set('saved', 1)
+  await writeFile(file('refresh.json'), invalid)
+  assert.throws(() => db.read(true), /Invalid JSON store/)
+  assert.throws(() => db.set('new', 2), /Invalid JSON store/)
+  assert.equal(await readFile(file('refresh.json'), 'utf8'), invalid)
+  return { parseRejected: true, corruptFilePreserved: true }
+})
+
 async function runWorker(id, parentRoot) {
   const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')

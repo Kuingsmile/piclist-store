@@ -32,7 +32,12 @@ class DBStore {
   async read(flush = false): Promise<ILowData | null> {
     if (flush || !this.hasRead) {
       this.hasRead = true
-      await this.db.read()
+      try {
+        await this.db.read()
+      } catch (error) {
+        this.hasRead = false
+        throw error
+      }
     }
     return this.db.data
   }

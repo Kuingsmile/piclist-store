@@ -22,7 +22,6 @@ class ZlibAdapter {
     new Promise((resolve, reject) => gzip(data, (err, result) => (err ? reject(err) : resolve(result))))
 
   private handleError(err: any, defaultValue?: any) {
-    console.error(err)
     this.errorList.push(err)
     return defaultValue
   }
@@ -46,7 +45,8 @@ class ZlibAdapter {
       const str = strFromU8(decompressedData)
       return JSON.parse(str)
     } catch (err: any) {
-      return this.handleError(err, defaultData)
+      this.handleError(err)
+      throw err
     }
   }
 

@@ -23,8 +23,9 @@ class JSONStore {
 
   read(flush = false): IJSON {
     if (flush || !this.hasRead) {
-      this.hasRead = true
+      this.hasRead = false
       this.db.read()
+      this.hasRead = true
     }
     return this.db.data as IJSON
   }
@@ -34,6 +35,7 @@ class JSONStore {
   }
 
   set(key: string, value: any): void {
+    this.read()
     this.db.chain.set(key, value).value()
     this.db.write()
   }
@@ -43,6 +45,7 @@ class JSONStore {
   }
 
   unset(key: string, value?: any): boolean {
+    this.read()
     if (value === undefined) {
       const keys = key.split('.')
       if (keys.length === 1) {
@@ -63,6 +66,7 @@ class JSONStore {
   }
 
   clear(): void {
+    this.read()
     this.db.data = {}
     this.db.write()
   }

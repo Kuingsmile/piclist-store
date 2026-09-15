@@ -27,9 +27,10 @@ export class JSONAdapter {
     } catch (_e) {
       try {
         return JSON.parse(data)
-      } catch (e) {
-        console.error('[Store] JSON parse error', e)
-        return {}
+      } catch (_error) {
+        // Parser diagnostics can contain configuration secrets.
+        // eslint-disable-next-line preserve-caught-error
+        throw new Error('Invalid JSON store contents')
       }
     }
   }
