@@ -18,21 +18,22 @@ export class JSONAdapter {
     if (data === null) {
       return {}
     }
+    let result: any
     try {
-      const res = json.parse(data || '{}')
-      if (res === null || typeof res !== 'object') {
-        return {}
-      }
-      return res as IJSON
+      result = json.parse(data || '{}')
     } catch (_e) {
       try {
-        return JSON.parse(data)
+        result = JSON.parse(data)
       } catch (_error) {
         // Parser diagnostics can contain configuration secrets.
         // eslint-disable-next-line preserve-caught-error
         throw new Error('Invalid JSON store contents')
       }
     }
+    if (result === null || typeof result !== 'object' || Object.getPrototypeOf(result) !== Object.prototype) {
+      throw new Error('JSON store root must be an object')
+    }
+    return result as IJSON
   }
 
   write(obj: any): void {

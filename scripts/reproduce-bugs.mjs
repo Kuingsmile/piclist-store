@@ -807,6 +807,22 @@ verify('12', async () => {
   return { dotAndBracketPathsRemoved: true, nestedOverloadPreserved: true }
 })
 
+verify('13', async () => {
+  const p = file('unsupported-root.json')
+  for (const rootValue of ['[]', '[1,2]', 'null', 'true', '"text"', '123']) {
+    await writeFile(p, rootValue)
+    assert.throws(() => new JSONStore(p), /root must be an object/, 'root=' + rootValue)
+    assert.equal(await readFile(p, 'utf8'), rootValue)
+  }
+  await writeFile(p, '{"nested":[1,2]}')
+  const config = new JSONStore(p)
+  config.set('theme', 'dark')
+  const reopened = new JSONStore(p)
+  assert.equal(reopened.get('theme'), 'dark')
+  assert.deepEqual(Array.from(reopened.get('nested')), [1, 2])
+  return { invalidRootsRejected: 6, originalBytesPreserved: true, nestedArraysSupported: true }
+})
+
 async function runWorker(id, parentRoot) {
   const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')
@@ -829,7 +845,7 @@ async function runWorker(id, parentRoot) {
         errorCode: error.code,
         assertion:
           error instanceof assert.AssertionError
-            ? { actual: error.actual, expected: error.expected, operator: error.operator }
+            ? { actual: error.actual, expected: error.expected, operator: error.operator, message: error.message }
             : undefined,
         location: error.stack
           ?.split('\n')
