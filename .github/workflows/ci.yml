@@ -26,3 +26,4 @@ jobs:
       - run: yarn test:regressions
       - run: yarn test:types
       - run: yarn test:compat
+      - run: yarn test:package

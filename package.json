@@ -15,12 +15,19 @@
   "type": "module",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist/",
+    "README.md",
+    "CHANGELOG.md",
+    "License"
+  ],
   "scripts": {
     "benchmark": "node scripts/benchmark.mjs",
     "build": "rollup -c",
@@ -35,6 +42,7 @@
     "repro:bugs": "npm run build && node scripts/reproduce-bugs.mjs",
     "test": "node ./test_db.js",
     "test:compat": "node scripts/check-compatibility.mjs",
+    "test:package": "node scripts/check-package.mjs",
     "test:unit": "node --test tests/*.test.mjs",
     "test:regressions": "node scripts/reproduce-bugs.mjs --verify-fixed",
     "test:types": "tsc --ignoreConfig --noEmit --strict --module nodenext --target es2022 --skipLibCheck tests/types/consumer.ts"
