@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
@@ -12,6 +13,8 @@ const execFileAsync = promisify(execFile)
 const scriptPath = fileURLToPath(import.meta.url)
 const caseTimeoutMs = 15_000
 const cases = new Map()
+const fixes = new Map()
+let verifyFixed = false
 let root
 let DBStore
 let JSONStore
@@ -183,6 +186,46 @@ function test(id, run) {
   assert(!cases.has(id), 'Duplicate case ID')
   cases.set(id, run)
 }
+
+function verify(id, run) {
+  assert(!fixes.has(id), 'Duplicate verification ID')
+  fixes.set(id, run)
+}
+
+verify('01', async () => {
+  const db = await seed('write-order.db', [])
+  const adapter = db.getAdapter()
+  const compress = adapter.gzipAsync
+  let started, release
+  const entered = new Promise(resolve => {
+    started = resolve
+  })
+  const gate = new Promise(resolve => {
+    release = resolve
+  })
+  let first = true
+  adapter.gzipAsync = async data => {
+    if (first) {
+      first = false
+      started()
+      await gate
+    }
+    return compress(data)
+  }
+  const inserted = db.insert({ id: 'a' })
+  await entered
+  const removed = db.removeById('a')
+  // Give an unqueued deletion a chance to finish, but always release the first write.
+  try {
+    await Promise.race([removed, delay(150)])
+  } finally {
+    release()
+  }
+  await Promise.all([inserted, removed])
+  assert.equal((await db.get()).total, 0)
+  assert.equal((await new DBStore(file('write-order.db'), 'items').get()).total, 0)
+  return { memoryCount: 0, persistedCount: 0 }
+})
 
 const file = name => join(root, name)
 const seed = async (name, data = [{ id: 'saved', value: 1 }]) => {
@@ -490,14 +533,14 @@ test('03-write', async () => {
 })
 
 async function runWorker(id, parentRoot) {
-  const run = cases.get(id)
+  const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')
   root = await mkdtemp(join(parentRoot, id + '-'))
   // Loading in the worker keeps --help and --list usable before the first build.
   ;({ DBStore, JSONStore } = await import('../dist/index.js'))
   try {
     const observed = await quiet(run)
-    process.stdout.write(JSON.stringify({ status: 'CONFIRMED', observed, fixtures: root }))
+    process.stdout.write(JSON.stringify({ status: verifyFixed ? 'FIXED' : 'CONFIRMED', observed, fixtures: root }))
   } catch (error) {
     // Never forward arbitrary library diagnostics or file contents.
     process.stdout.write(
@@ -517,14 +560,18 @@ async function runWorker(id, parentRoot) {
 
 async function runIsolated(meta, parentRoot) {
   try {
-    const { stdout } = await execFileAsync(process.execPath, [scriptPath, '--worker', meta.id, parentRoot], {
-      timeout: caseTimeoutMs,
-      killSignal: 'SIGKILL',
-      maxBuffer: 1024 * 1024,
-      windowsHide: true,
-    })
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [scriptPath, '--worker', meta.id, parentRoot, ...(verifyFixed ? ['--verify-fixed'] : [])],
+      {
+        timeout: caseTimeoutMs,
+        killSignal: 'SIGKILL',
+        maxBuffer: 1024 * 1024,
+        windowsHide: true,
+      },
+    )
     const result = JSON.parse(stdout)
-    assert(['CONFIRMED', 'NOT CONFIRMED', 'ERROR'].includes(result.status), 'Invalid worker result')
+    assert(['FIXED', 'CONFIRMED', 'NOT CONFIRMED', 'ERROR'].includes(result.status), 'Invalid worker result')
     return { ...meta, ...result }
   } catch (error) {
     return {
@@ -539,6 +586,7 @@ async function runIsolated(meta, parentRoot) {
 }
 
 function help() {
+  console.log('Add --verify-fixed to assert correct behavior after fixes.')
   console.log('Usage: npm run repro:bugs [-- --case <finding number or exact case ID>]')
   console.log('       node scripts/reproduce-bugs.mjs --list')
   console.log('CONFIRMED means the bug is present. Exit 0: all selected bugs confirmed; 1: not confirmed; 2: error.')
@@ -573,7 +621,11 @@ async function main(args) {
 
   const outputRoot = await mkdtemp(join(tmpdir(), 'piclist-store-repro-'))
   const results = []
-  console.log('CONFIRMED means the faulty behavior was reproduced; this is not a regression pass.')
+  console.log(
+    verifyFixed
+      ? 'FIXED requires assertions of the expected correct behavior.'
+      : 'CONFIRMED means the faulty behavior was reproduced; this is not a regression pass.',
+  )
   for (const meta of selected) {
     const result = await runIsolated(meta, outputRoot)
     results.push(result)
@@ -583,7 +635,7 @@ async function main(args) {
     console.log('  Observed: ' + (result.observed ? JSON.stringify(result.observed) : result.reason))
   }
 
-  const confirmed = results.filter(result => result.status === 'CONFIRMED').length
+  const confirmed = results.filter(result => result.status === (verifyFixed ? 'FIXED' : 'CONFIRMED')).length
   const errors = results.filter(result => result.status === 'ERROR').length
   const summary = {
     confirmed,
@@ -595,7 +647,13 @@ async function main(args) {
   const reportPath = join(outputRoot, 'results.json')
   await writeFile(reportPath, JSON.stringify({ nodeVersion: process.version, summary, results }, null, 2) + '\n')
   console.log(
-    '\n' + confirmed + '/' + results.length + ' cases confirmed across ' + summary.findingsCovered + ' findings.',
+    '\n' +
+      confirmed +
+      '/' +
+      results.length +
+      (verifyFixed ? ' cases verified fixed across ' : ' cases confirmed across ') +
+      summary.findingsCovered +
+      ' findings.',
   )
   console.log('Not confirmed: ' + summary.notConfirmed + '; errors: ' + summary.errors)
   console.log('Fixtures and JSON report: ' + reportPath)
@@ -603,7 +661,9 @@ async function main(args) {
 }
 
 try {
-  const args = process.argv.slice(2)
+  const input = process.argv.slice(2)
+  verifyFixed = input.includes('--verify-fixed')
+  const args = input.filter(arg => arg !== '--verify-fixed')
   if (args.length === 3 && args[0] === '--worker') {
     await runWorker(args[1], args[2])
   } else {

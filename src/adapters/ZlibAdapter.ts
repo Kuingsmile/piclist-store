@@ -7,6 +7,7 @@ class ZlibAdapter {
   private readonly collectionName: string
   public errorList: (Error | string)[]
   public readCount = 0
+  private writeQueue: Promise<void> = Promise.resolve()
 
   constructor(dbPath: string, collectionName: string, errorList: (Error | string)[]) {
     this.dbPath = dbPath
@@ -51,8 +52,13 @@ class ZlibAdapter {
 
   async write(data: any): Promise<void> {
     try {
-      const compressedResult = await this.gzipAsync(Buffer.from(JSON.stringify(data)))
-      await writeFile(this.dbPath, Buffer.from(compressedResult))
+      const snapshot = Buffer.from(JSON.stringify(data))
+      const pending = this.writeQueue.then(async () => {
+        const compressedResult = await this.gzipAsync(snapshot)
+        await writeFile(this.dbPath, Buffer.from(compressedResult))
+      })
+      this.writeQueue = pending.catch(() => {})
+      await pending
     } catch (err: any) {
       this.handleError(err)
       throw err
