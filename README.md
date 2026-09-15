@@ -9,10 +9,10 @@ compression and metadata management.
 ## ✨ Features
 
 - 🗄️ **Dual Storage Options**: JSON-based and binary database storage
-- 🔍 **Rich Query Interface**: Support for filtering, sorting, pagination
+- 🔍 **Query Interface**: ID lookup, creation-time sorting, pagination, and counts
 - 📦 **Built-in Compression**: Zlib adapter for efficient storage
 - 🎯 **TypeScript Support**: Full type definitions included
-- ⚡ **Async/Await**: Modern promise-based API
+- ⚡ **Async/Await**: Promise-based DBStore and synchronous JSONStore
 - 🔄 **Batch Operations**: Insert, update, and remove multiple items
 - 📝 **Auto Metadata**: Automatic timestamps and unique ID generation
 
@@ -32,7 +32,8 @@ minimum. Node.js type definitions follow the supported Node.js 22 major.
 
 ### DBStore (Binary Database)
 
-Perfect for storing large amounts of structured data with efficient querying capabilities.
+Store local structured collections in a gzip-compressed JSON file. The database is loaded into memory, and each mutation
+rewrites the whole file. Prefer batch methods for large updates and measure performance with your workload.
 
 ```typescript
 import { DBStore } from '@piclist/store'
@@ -71,7 +72,7 @@ const config = new JSONStore('config.json')
 // Set configuration values
 config.set('theme', 'dark')
 config.set('language', 'en')
-config.write() // Persist to disk
+// Each set() call persists immediately. Use setMany() to commit several settings once.
 
 // Get configuration
 const theme = config.get('theme') // 'dark'
@@ -116,6 +117,10 @@ console.log(filtered)
 ##### `.insert<T>(value: T): Promise<IResult<T>>`
 
 Insert a single item into the collection.
+
+Records must be objects. An omitted or empty string ID generates a UUID v4; supplied IDs must be strings. Inserting an
+existing ID merges fields into that record, preserves its original `createdAt`, and returns the merged record. Use
+`insertMany()` to insert an array of records.
 
 ```typescript
 const item = await db.insert({
@@ -174,6 +179,23 @@ Remove an item by its ID.
 await db.removeById('some-uuid')
 ```
 
+##### `.removeMany(ids: string[]): Promise<{ total: number; success: number }>`
+
+Remove several records in one write. `total` counts requested IDs, including duplicates; `success` counts distinct
+records actually removed. Missing IDs are ignored. An empty batch does not write the file.
+
+```typescript
+const removed = await db.removeMany(['id1', 'id2'])
+```
+
+##### `.count(): Promise<number>` and `.hasById(id: string): Promise<boolean>`
+
+Count records without creating a result array, or check whether an ID exists.
+
+##### `.refresh(): Promise<ILowData | null>`
+
+Reload the complete database from disk. Equivalent to `read(true)`.
+
 ##### `.overwrite<T>(values: T[]): Promise<IResult<T>[]>`
 
 Replace the entire collection with new data.
@@ -204,10 +226,19 @@ const value = config.get('theme', 'light')
 
 ##### `.set(key: string, value: any): void`
 
-Set a value for a key.
+Set a value for a dot/bracket path and persist it immediately.
 
 ```typescript
 config.set('theme', 'dark')
+```
+
+##### `.setMany(values: Record<string, any>): void`
+
+Set several dot/bracket paths in one atomic write. Entries are applied in JavaScript property enumeration order. If the
+write fails, the entire batch is rolled back. An empty object does not write the file.
+
+```typescript
+config.setMany({ 'ui.theme': 'dark', 'upload.allowedTypes': ['jpg', 'png'] })
 ```
 
 ##### `.has(key: string): boolean`
@@ -220,9 +251,10 @@ if (config.has('theme')) {
 }
 ```
 
-##### `.unset(key: string): void`
+##### `.unset(key: string, value?: any): boolean`
 
-Remove a key and its value.
+Remove a dot/bracket path and persist immediately. Returns whether the path existed. Removing an array index compacts
+the array. The legacy `unset(parentPath, childPath)` overload remains available.
 
 ```typescript
 config.unset('oldSetting')
@@ -237,28 +269,36 @@ Read data from file (automatically called on access).
 Write current data to file.
 
 ```typescript
-config.set('newKey', 'newValue')
-config.write() // Persist changes
+const data = config.read()
+data.newKey = 'newValue'
+config.write() // Explicitly persist edits made directly through read().
 ```
+
+`write()` is unnecessary after `set()`, `setMany()`, `unset()`, or `clear()`. It throws `WRITE_CONFLICT` if the file
+changed since this instance last read it. Reload and reapply the intended edits before retrying.
+
+##### `.refresh(): IJSON`
+
+Reload configuration synchronously. Equivalent to `read(true)`; a typed JSONStore returns its configured schema type.
 
 ## 🔧 Advanced Usage
 
 ### Refresh and concurrent access
 
-Reads are cached per instance. Use `await db.refresh()` or `config.refresh()` to see changes made by another
-instance or process; these are aliases for `read(true)`. Refresh discards unsaved changes made through returned
-objects. DBStore reads remain asynchronous; JSONStore reads, writes, and refresh remain synchronous.
+Reads are cached per instance. Use `await db.refresh()` or `config.refresh()` to see changes made by another instance or
+process; these are aliases for `read(true)`. Refresh discards unsaved changes made through returned objects. DBStore
+reads remain asynchronous; JSONStore reads, writes, and refresh remain synchronous.
 
-Mutations reload the latest file before changing it. DBStore serializes mutations to the same canonical file path
-within one Node.js process; JSONStore mutations run synchronously and explicit `write()` rejects a stale snapshot.
-These guarantees do not provide a cross-process transaction lock. Applications with several processes should route
-writes through one owning process. Atomic file replacement prevents partial files but does not merge simultaneous
-writes from independent processes.
+Mutations reload the latest file before changing it. DBStore serializes mutations to the same canonical file path within
+one Node.js process; JSONStore mutations run synchronously and explicit `write()` rejects a stale snapshot. These
+guarantees do not provide a cross-process transaction lock. Applications with several processes should route writes
+through one owning process. Atomic file replacement prevents partial files but does not merge simultaneous writes from
+independent processes.
 
 Returned records retain the existing live-object behavior. Use the update methods to persist changes, rather than
 editing returned objects and assuming those edits will be saved by a later mutation.
 
-### Custom Filtering
+### Ordering and Pagination
 
 ```typescript
 // Get recent items
@@ -302,10 +342,11 @@ console.log(`Updated ${updateResult.success}/${updateResult.total} items`)
 const settings = new JSONStore('app-settings.json')
 
 // Default configuration
-settings.set('upload.maxSize', 10 * 1024 * 1024) // 10MB
-settings.set('upload.allowedTypes', ['jpg', 'png', 'gif'])
-settings.set('ui.theme', 'auto')
-settings.write()
+settings.setMany({
+  'upload.maxSize': 10 * 1024 * 1024, // 10MB
+  'upload.allowedTypes': ['jpg', 'png', 'gif'],
+  'ui.theme': 'auto',
+})
 
 // Runtime access
 const maxSize = settings.get('upload.maxSize')
@@ -324,8 +365,8 @@ interface ImageRecord {
   size: number
 }
 
-const db = new DBStore('images.db', 'uploads')
-const image = await db.insert<ImageRecord>({
+const db = new DBStore<ImageRecord>('images.db', 'uploads')
+const image = await db.insert({
   url: 'https://example.com/photo.jpg',
   title: 'Beautiful Sunset',
   tags: ['sunset', 'nature'],
@@ -335,7 +376,58 @@ const image = await db.insert<ImageRecord>({
 // TypeScript knows the shape of `image`
 console.log(image.createdAt) // number
 console.log(image.tags) // string[]
+const images = await db.get() // IGetResult<ImageRecord>
+const found = await db.getById(image.id) // IResult<ImageRecord> | undefined
 ```
+
+Existing untyped constructors and method-level generics such as `db.insert<ImageRecord>(value)` continue to work.
+`IFilter`, `IGetResult`, `IResult`, `IMetaInfo`, `IObject`, `IJSON`, `JSONValue`, and `StoreErrorCode` are exported from
+the package root.
+
+```typescript
+const settings = new JSONStore<{ theme: 'light' | 'dark'; enabled?: boolean }>('settings.json')
+const theme = settings.get('theme') // 'light' | 'dark'
+const enabled = settings.get('enabled', false) // boolean
+const limit = settings.get<number>('nested.limit', 10) // Explicit type for dynamic/nested paths
+```
+
+Types do not validate application schemas at runtime. Use your own schema validation when reading external data.
+
+## Errors and compatibility
+
+`StoreError` extends `Error` and supplies a stable `code` without embedding stored data in its message:
+
+| Code             | Meaning                                                            |
+| ---------------- | ------------------------------------------------------------------ |
+| `INVALID_RECORD` | A write received an unsupported record or ID type.                 |
+| `INVALID_STORE`  | Parsed contents violate the required database/configuration shape. |
+| `WRITE_CONFLICT` | Explicit JSON `write()` would overwrite a newer file snapshot.     |
+
+Filesystem and compression failures also propagate to callers. DBStore retains its public `errorList` for adapter
+failures. Catch errors around writes; a rejected batch restores its in-memory state and does not intentionally commit a
+partial replacement. Atomicity applies to each batch call, not to a sequence of separate calls.
+
+The gzip database layout, collection names, string IDs, timestamp fields, JSON comment support, ESM entry point, and
+existing constructor arguments remain compatible with `3.0.1`. The compatibility suite tests writing and reading across
+both versions. Safety corrections since that release intentionally reject malformed files, non-object JSON roots,
+duplicate/invalid stored IDs, reserved index collection names, and attempts to change an ID through `updateById()`.
+Corrupt files are preserved instead of being treated as empty databases. Ordering explicitly requested with `orderBy`
+uses creation timestamps, and reinsertion retains the original creation time.
+
+For legacy database inspection, run `node scripts/inspect-store.mjs path/to/piclist.db` from this repository. It reads
+the file without modifying it and reports only counts of collections, records, invalid IDs, and duplicate IDs. Back up
+any flagged database before an application-specific repair; IDs are never silently converted.
+
+## Development checks
+
+Run `yarn build`, then `yarn test`, `yarn test:unit`, `yarn test:regressions`, `yarn test:types`, `yarn test:compat`,
+and `yarn test:package`. `yarn lint:check` checks formatting without changing files.
+
+`yarn test:compat --json path/to/data.json --db path/to/piclist.db` additionally checks temporary copies of existing
+files against the published `3.0.1` package. It suppresses file contents and verifies that originals remain unchanged.
+`yarn benchmark` measures full-file reads and batch updates on synthetic 1,000- and 10,000-record datasets; supply other
+sizes as arguments. Mutation lookups use a temporary ID map. Public reads keep their existing live-object behavior, so
+individual `getById()` calls still scan the collection.
 
 ## 📄 License
 

@@ -22,3 +22,18 @@ test('invalid records and serialized IDs never damage committed data', async () 
   assert.ok(before.equals(await readFile(path)))
   assert.equal((await new DBStore(path, 'items').get()).total, 1)
 })
+
+test('generated UUIDs and caller-supplied IDs preserve the storage contract', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'store-ids-'))
+  const path = join(root, 'data.db')
+  const db = new DBStore(path, 'items')
+  const generated = await db.insertMany(Array.from({ length: 32 }, () => ({ value: true })))
+  assert.equal(new Set(generated.map(item => item.id)).size, generated.length)
+  for (const item of generated) {
+    assert.match(item.id, /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/)
+  }
+  const provided = await db.insert({ id: 'custom-id', createdAt: 0 })
+  assert.equal(provided.id, 'custom-id')
+  assert.equal(provided.createdAt, 0)
+  assert.deepEqual(await new DBStore(path, 'items').getById('custom-id'), provided)
+})

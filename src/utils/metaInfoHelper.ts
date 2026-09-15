@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import { IInsertData, IMetaInfoMode, IObject } from '../types'
 import { validateRecord } from './validation'
 
@@ -43,22 +45,13 @@ function transformArgumentsByMode(mode: IMetaInfoMode, args: IInsertData): IInse
   }
 }
 
-function generateUUID(a: any = '', b: any = ''): string {
-  for (
-    b = a = '';
-    a++ < 36;
-    b += (a * 51) & 52 ? (a ^ 15 ? 8 ^ (Math.random() * (a ^ 20 ? 16 : 4)) : 4).toString(16) : '-'
-  );
-  return b
-}
-
 function generateMetaInfo(value: IObject): IObject {
   validateRecord(value)
   const now = Date.now()
 
   return {
     ...value,
-    id: value.id || generateUUID(),
+    id: value.id || randomUUID(),
     createdAt: value.createdAt ?? now,
     updatedAt: now,
   }
