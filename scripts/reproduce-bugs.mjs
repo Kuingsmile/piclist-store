@@ -789,6 +789,24 @@ verify('11', async () => {
   return { ascending: asc, descending: desc, paginationUsesSortedOrder: true }
 })
 
+verify('12', async () => {
+  const db = new JSONStore(file('paths.json'))
+  for (const path of ['items[0]', 'nested.child', '["quoted"]', 'plain']) {
+    db.set(path, { value: 1 })
+    assert.equal(db.has(path), true)
+    assert.equal(db.unset(path), true)
+    assert.equal(db.has(path), false)
+    assert.equal(db.unset(path), false)
+  }
+  db.set('parent.child', 2)
+  db.set('array', ['a', 'b', 'c'])
+  assert.equal(db.unset('array[1]'), true)
+  assert.deepEqual(Array.from(new JSONStore(file('paths.json')).get('array')), ['a', 'c'])
+  assert.equal(db.unset('parent', 'child'), true)
+  assert.equal(new JSONStore(file('paths.json')).has('parent.child'), false)
+  return { dotAndBracketPathsRemoved: true, nestedOverloadPreserved: true }
+})
+
 async function runWorker(id, parentRoot) {
   const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')
@@ -809,6 +827,14 @@ async function runWorker(id, parentRoot) {
             : 'The case threw before it could confirm the bug.',
         errorType: error.name,
         errorCode: error.code,
+        assertion:
+          error instanceof assert.AssertionError
+            ? { actual: error.actual, expected: error.expected, operator: error.operator }
+            : undefined,
+        location: error.stack
+          ?.split('\n')
+          .find(line => line.includes('reproduce-bugs.mjs:'))
+          ?.trim(),
         fixtures: root,
       }),
     )
@@ -890,6 +916,7 @@ async function main(args) {
     console.log('  Method: ' + meta.method)
     console.log('  Expected: ' + meta.expected)
     console.log('  Observed: ' + (result.observed ? JSON.stringify(result.observed) : result.reason))
+    if (result.assertion) console.log('  Assertion: ' + JSON.stringify(result.assertion) + ' ' + result.location)
   }
 
   const confirmed = results.filter(result => result.status === (verifyFixed ? 'FIXED' : 'CONFIRMED')).length

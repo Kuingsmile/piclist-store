@@ -72,23 +72,22 @@ class JSONStore {
   @JSONStore.mutation
   unset(key: string, value?: any): boolean {
     this.read()
-    if (value === undefined) {
-      const keys = key.split('.')
-      if (keys.length === 1) {
-        const exists = key in this.db.data
-        delete this.db.data[key]
-        this.db.write()
-        return exists
-      } else {
-        const res = lodash.unset(this.db.data, key)
-        this.db.write()
-        return res
-      }
+    if (value !== undefined && !lodash.has(this.db.data, key)) return false
+    const target = value === undefined ? this.db.data : lodash.get(this.db.data, key)
+    const path = value === undefined ? key : value
+    if (!lodash.has(target, path)) return false
+    const parts = typeof path === 'string' && Object.hasOwn(target, path) ? [path] : lodash.toPath(path)
+    const leaf = parts.pop()!
+    const parent = parts.length ? lodash.get(target, parts) : target
+    let removed: boolean
+    if (Array.isArray(parent) && /^(0|[1-9]\d*)$/.test(leaf) && Number(leaf) < parent.length) {
+      parent.splice(Number(leaf), 1)
+      removed = true
     } else {
-      const res = this.db.chain.get(key).unset(value).value()
-      this.db.write()
-      return res
+      removed = lodash.unset(target, path)
     }
+    this.db.write()
+    return removed
   }
 
   @JSONStore.mutation
