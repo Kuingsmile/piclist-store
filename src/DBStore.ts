@@ -9,6 +9,7 @@ class DBStore {
   private readonly collectionName: string
   private readonly collectionKey: string
   private hasRead = false
+  private reading: Promise<void> | null = null
   public errorList: (Error | string)[] = []
   private readonly adapter: ZlibAdapter
 
@@ -30,15 +31,18 @@ class DBStore {
   }
 
   async read(flush = false): Promise<ILowData | null> {
-    if (flush || !this.hasRead) {
-      this.hasRead = true
-      try {
-        await this.db.read()
-      } catch (error) {
-        this.hasRead = false
-        throw error
-      }
+    if (!this.reading && (flush || !this.hasRead)) {
+      this.hasRead = false
+      this.reading = this.db
+        .read()
+        .then(() => {
+          this.hasRead = true
+        })
+        .finally(() => {
+          this.reading = null
+        })
     }
+    await this.reading
     return this.db.data
   }
 

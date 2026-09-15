@@ -561,6 +561,55 @@ verify('02-json', async () => {
   return { parseRejected: true, corruptFilePreserved: true }
 })
 
+verify('03-read', async () => {
+  await seed('initial.db')
+  const db = new DBStore(file('initial.db'), 'items')
+  const results = await Promise.all([db.get(), db.get(), db.get()])
+  assert.deepEqual(
+    results.map(result => result.total),
+    [1, 1, 1],
+  )
+  assert.equal(db.getAdapter().readCount, 1)
+  await db.read(true)
+  assert.equal(db.getAdapter().readCount, 2)
+  return { totals: results.map(result => result.total), initialLoads: 1 }
+})
+verify('03-write', async () => {
+  await seed('initial-write.db', [{ id: 'saved' }])
+  const db = new DBStore(file('initial-write.db'), 'items')
+  const adapter = db.getAdapter()
+  const read = adapter.read.bind(adapter)
+  let entered, release
+  const started = new Promise(resolve => {
+    entered = resolve
+  })
+  const gate = new Promise(resolve => {
+    release = resolve
+  })
+  adapter.read = async () => {
+    const result = await read()
+    entered()
+    await gate
+    return result
+  }
+  const loading = db.read()
+  await started
+  let settled = false
+  const inserting = db.insert({ id: 'new' }).finally(() => {
+    settled = true
+  })
+  try {
+    await delay(30)
+    assert.equal(settled, false)
+  } finally {
+    release()
+  }
+  await Promise.all([loading, inserting])
+  const ids = (await new DBStore(file('initial-write.db'), 'items').get()).data.map(item => item.id)
+  assert.deepEqual(ids, ['saved', 'new'])
+  return { waitedForInitialization: true, persistedIds: ids }
+})
+
 async function runWorker(id, parentRoot) {
   const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')
