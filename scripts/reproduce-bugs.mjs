@@ -645,6 +645,22 @@ verify('05-partial', async () => {
   return { failedBatchWrites: writes, originalFilePreservedOnFailure: true, retryCount: 3 }
 })
 
+verify('06', async () => {
+  const db = await seed('immutable-id.db', [{ id: 'a', value: 1 }])
+  await assert.rejects(db.updateById('a', { id: 'b' }), /IDs cannot be changed/)
+  assert.equal(await db.updateById('a', { value: 2 }), true)
+  assert.equal(await db.updateById('missing', { value: 3 }), false)
+  await db.updateById('a', { id: undefined, value: 4 })
+  assert.equal((await db.getById('a')).value, 4)
+  await db.insert({ id: 'b' })
+  assert.deepEqual(
+    (await db.get()).data.map(item => item.id),
+    ['a', 'b'],
+  )
+  assert.deepEqual(await db.updateMany([{ id: 'a', value: 5 }, { id: 'missing' }]), { total: 2, success: 1 })
+  return { renameRejected: true, originalIdUsable: true, uniqueIds: ['a', 'b'] }
+})
+
 async function runWorker(id, parentRoot) {
   const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')

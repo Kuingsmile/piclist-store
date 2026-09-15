@@ -114,11 +114,13 @@ class DBStore {
 
   @metaInfoMethodWrapper(IMetaInfoMode.update)
   async updateById(id: string, value: IObject): Promise<boolean> {
+    if (value.id !== undefined && value.id !== id) throw new Error('Record IDs cannot be changed')
     const collection = await this.getCollection()
     const result = await this.getCollectionKey(id)
     if (result) {
-      const item = collection.find(item => item.id === id) || {}
-      Object.assign(item, value)
+      const item = collection.find(item => item.id === id)
+      if (!item) return false
+      Object.assign(item, value, { id })
       await this.db.write()
       return true
     } else {
@@ -134,9 +136,10 @@ class DBStore {
       if (item.id) {
         const result = await this.getCollectionKey(item.id)
         if (result) {
-          successCount++
-          const target = collection.find(t => t.id === item.id) || {}
+          const target = collection.find(t => t.id === item.id)
+          if (!target) continue
           Object.assign(target, item)
+          successCount++
         }
       }
     }
