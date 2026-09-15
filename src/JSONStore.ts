@@ -36,8 +36,14 @@ class JSONStore {
     return this.db.data as IJSON
   }
 
-  get(key = ''): any {
-    return this.db.chain.get(key).value()
+  get(key = '', defaultValue?: any): any {
+    this.read()
+    return this.db.chain.get(key, defaultValue).value()
+  }
+
+  write(): void {
+    this.read()
+    this.db.write()
   }
 
   private mutate<T>(operation: () => T): T {

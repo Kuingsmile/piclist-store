@@ -747,6 +747,25 @@ verify('09', async () => {
   return { binaryMutationsRolledBack: 5, jsonMutationsRolledBack: 3, laterCommitContainsOnlySuccessfulChanges: true }
 })
 
+verify('10-write', async () => {
+  const p = file('explicit-write.json')
+  const db = new JSONStore(p)
+  db.set('theme', 'dark')
+  db.read().language = 'en'
+  db.write()
+  assert.deepEqual(new JSONStore(p).read(), { theme: 'dark', language: 'en' })
+  return { explicitWriteAvailable: true, persistedKeys: ['theme', 'language'] }
+})
+verify('10-default', async () => {
+  const db = new JSONStore(file('defaults.json'))
+  assert.equal(db.get('missing', 'light'), 'light')
+  for (const value of [false, 0, '', null]) {
+    db.set('present', value)
+    assert.equal(db.get('present', 'fallback'), value)
+  }
+  return { missingFallback: 'light', falsyValuesPreserved: true }
+})
+
 async function runWorker(id, parentRoot) {
   const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')
