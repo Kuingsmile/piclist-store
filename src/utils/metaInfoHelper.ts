@@ -57,7 +57,7 @@ function generateMetaInfo(value: IObject): IObject {
   return {
     ...value,
     id: value.id || generateUUID(),
-    createdAt: value.createdAt || now,
+    createdAt: value.createdAt ?? now,
     updatedAt: now,
   }
 }

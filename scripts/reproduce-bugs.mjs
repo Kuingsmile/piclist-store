@@ -823,6 +823,18 @@ verify('13', async () => {
   return { invalidRootsRejected: 6, originalBytesPreserved: true, nestedArraysSupported: true }
 })
 
+verify('14', async () => {
+  const db = await seed('upsert-fixed.db', [{ id: 'a', createdAt: 0, oldField: 'kept' }])
+  const returned = await db.insert({ id: 'a', value: 2 })
+  assert.equal(returned.createdAt, 0)
+  assert.equal(returned.oldField, 'kept')
+  assert.equal(returned.value, 2)
+  assert.deepEqual(returned, await db.getById('a'))
+  assert.deepEqual(returned, await new DBStore(file('upsert-fixed.db'), 'items').getById('a'))
+  assert.equal((await db.get()).total, 1)
+  return { originalCreationTimePreserved: true, returnedRecordMatchesDisk: true, duplicateCount: 0 }
+})
+
 async function runWorker(id, parentRoot) {
   const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')

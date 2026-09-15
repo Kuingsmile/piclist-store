@@ -125,9 +125,10 @@ class DBStore {
     const result = await this.getCollectionKey(id)
     if (result) {
       const item = (await this.getCollection()).find(item => item.id === id)
-      if (item) Object.assign(item, value)
+      if (!item) throw new Error('Database index does not match the collection')
+      Object.assign(item, value, { id: item.id, createdAt: item.createdAt })
       if (writable) await this.db.write()
-      return value as IResult<T>
+      return item as IResult<T>
     }
     ;(await this.getCollection()).push(value as IResult<T>)
     await this.setCollectionKey(id)
