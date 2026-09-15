@@ -9,7 +9,7 @@ class LowWithLodash<T> extends LowSync<T> {
   chain: lodash.ExpChain<this['data']> = lodash.chain(this).get('data')
 }
 
-class JSONStore<T extends object = IJSON> {
+class JSONStore<T extends object = Record<string, any>> {
   private static mutation(_target: any, _name: string, descriptor: PropertyDescriptor) {
     const original = descriptor.value
     descriptor.value = function (this: JSONStore, ...args: any[]) {

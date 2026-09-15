@@ -13,8 +13,11 @@ async function legacyConsumer() {
   const updated: boolean = await db.updateById(saved.id, { tags: ['new'] })
   const config = new JSONStore('unused.json')
   config.set('theme', 'dark')
+  // Existing untyped callers keep the released permissive get() result.
+  const theme: string = config.get('theme')
+  const settings: IJSON = config.read()
   const removed: boolean = config.unset('theme')
-  return { tags, updated, removed }
+  return { tags, updated, removed, theme, settings }
 }
 
 void legacyConsumer
