@@ -204,6 +204,29 @@ class DBStore<T = IObject> {
     return (await this.getCollection()).find(item => item.id === id) as IResult<U> | undefined
   }
 
+  async count(): Promise<number> {
+    return (await this.getCollection()).length
+  }
+
+  async hasById(id: string): Promise<boolean> {
+    return (await this.getCollectionKey(id)) !== null
+  }
+
+  @DBStore.mutation
+  async removeMany(ids: string[]): Promise<{ total: number; success: number }> {
+    const requested = new Set(ids)
+    const collection = await this.getCollection()
+    const index = await this.getCollectionKeyMap()
+    const remaining = collection.filter(item => !requested.has(item.id))
+    const success = collection.length - remaining.length
+    if (success > 0) {
+      this.db.data[this.collectionName] = remaining
+      for (const id of requested) delete index[id]
+      await this.db.write()
+    }
+    return { total: ids.length, success }
+  }
+
   @DBStore.mutation
   async removeById(id: string): Promise<void> {
     const collection = await this.getCollection()

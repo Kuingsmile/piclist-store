@@ -70,6 +70,15 @@ class JSONStore<T extends object = IJSON> {
     this.db.write()
   }
 
+  /** Set dot/bracket paths in one atomic write, rolling back the entire batch on failure. */
+  @JSONStore.mutation
+  setMany(values: Record<string, any>): void {
+    const entries = Object.entries(values)
+    if (entries.length === 0) return
+    for (const [key, value] of entries) this.db.chain.set(key, value).value()
+    this.db.write()
+  }
+
   has(key: string): boolean {
     return this.db.chain.has(key).value()
   }

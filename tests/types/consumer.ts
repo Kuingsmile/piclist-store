@@ -26,6 +26,9 @@ async function typedConsumer() {
   const page: IGetResult<ImageRecord> = await db.get()
   const metadata: IMetaInfo = saved
   await db.insertMany([{ url: 'example', tags: [] }])
+  const count: number = await db.count()
+  const exists: boolean = await db.hasById(saved.id)
+  const removal: { total: number; success: number } = await db.removeMany([saved.id])
   await db.updateById(saved.id, { tags: ['updated'] })
   // @ts-expect-error Typed stores require the declared fields.
   await db.insert({ url: 'missing tags' })
@@ -39,9 +42,10 @@ async function typedConsumer() {
   const nested: number | undefined = config.get<number>('nested.limit')
   const limit: number = config.get<number>('nested.limit', 10)
   const raw: IJSON = { enabled: true, values: [null, 42, { name: 'example' }] }
+  config.setMany({ theme: 'dark', 'nested.enabled': true })
   const value: JSONValue = raw
   const code: StoreErrorCode = 'INVALID_RECORD'
-  return { found, page, metadata, theme, enabled, nested, limit, value, code }
+  return { found, page, metadata, theme, enabled, nested, limit, value, code, count, exists, removal }
 }
 
 void typedConsumer
