@@ -3,7 +3,8 @@
 [![npm version](https://badge.fury.io/js/@piclist%2Fstore.svg)](https://badge.fury.io/js/@piclist%2Fstore)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A simple and efficient key-value store for PicList, supporting both JSON and binary data storage with built-in compression and metadata management.
+A simple and efficient key-value store for PicList, supporting both JSON and binary data storage with built-in
+compression and metadata management.
 
 ## ✨ Features
 
@@ -23,10 +24,9 @@ Requires Node.js `^22.13.0 || >=24.0.0` (minimum: **22.13.0**; Node.js 23 is exc
 npm install @piclist/store
 ```
 
-Dependency updates retain `write-file-atomic` 7.x for this Node.js range,
-TypeScript 6.0.x for the supported `typescript-eslint` compiler API, and
-`rollup-plugin-dts` 6.4.x because 6.5.x pulls in Babel 8 with a higher Node.js minimum.
-Node.js type definitions follow the supported Node.js 22 major.
+Dependency updates retain `write-file-atomic` 7.x for this Node.js range, TypeScript 6.0.x for the supported
+`typescript-eslint` compiler API, and `rollup-plugin-dts` 6.4.x because 6.5.x pulls in Babel 8 with a higher Node.js
+minimum. Node.js type definitions follow the supported Node.js 22 major.
 
 ## 🚀 Quick Start
 
@@ -44,7 +44,7 @@ const db = new DBStore('data.db', 'images')
 const result = await db.insert({
   imgUrl: 'https://example.com/image.jpg',
   tags: ['nature', 'landscape'],
-  size: 1024
+  size: 1024,
 })
 
 console.log(result)
@@ -104,9 +104,9 @@ const all = await db.get()
 
 // Get with filtering and pagination
 const filtered = await db.get({
-  orderBy: 'desc',  // 'asc' | 'desc' - order by creation time
-  limit: 10,        // maximum number of items
-  offset: 0         // skip items (for pagination)
+  orderBy: 'desc', // 'asc' | 'desc' - order by creation time
+  limit: 10, // maximum number of items
+  offset: 0, // skip items (for pagination)
 })
 
 console.log(filtered)
@@ -120,7 +120,7 @@ Insert a single item into the collection.
 ```typescript
 const item = await db.insert({
   title: 'My Image',
-  url: 'https://example.com/image.jpg'
+  url: 'https://example.com/image.jpg',
 })
 ```
 
@@ -129,11 +129,7 @@ const item = await db.insert({
 Insert multiple items in a single operation.
 
 ```typescript
-const items = await db.insertMany([
-  { url: 'image1.jpg' },
-  { url: 'image2.jpg' },
-  { url: 'image3.jpg' }
-])
+const items = await db.insertMany([{ url: 'image1.jpg' }, { url: 'image2.jpg' }, { url: 'image3.jpg' }])
 ```
 
 ##### `.getById(id: string): Promise<IResult<T> | undefined>`
@@ -153,7 +149,7 @@ Update an existing item by ID. Returns `true` if successful, `false` if item not
 
 ```typescript
 const success = await db.updateById('some-uuid', {
-  title: 'Updated Title'
+  title: 'Updated Title',
 })
 ```
 
@@ -164,7 +160,7 @@ Update multiple items by their IDs.
 ```typescript
 const result = await db.updateMany([
   { id: 'id1', title: 'New Title 1' },
-  { id: 'id2', title: 'New Title 2' }
+  { id: 'id2', title: 'New Title 2' },
 ])
 
 console.log(result) // { total: 2, success: 2 }
@@ -183,10 +179,7 @@ await db.removeById('some-uuid')
 Replace the entire collection with new data.
 
 ```typescript
-const newCollection = await db.overwrite([
-  { url: 'new1.jpg' },
-  { url: 'new2.jpg' }
-])
+const newCollection = await db.overwrite([{ url: 'new1.jpg' }, { url: 'new2.jpg' }])
 ```
 
 ### JSONStore
@@ -256,13 +249,13 @@ config.write() // Persist changes
 // Get recent items
 const recent = await db.get({
   orderBy: 'desc',
-  limit: 5
+  limit: 5,
 })
 
 // Pagination
 const page2 = await db.get({
   limit: 20,
-  offset: 20
+  offset: 20,
 })
 ```
 
@@ -281,7 +274,7 @@ try {
 const updateResult = await db.updateMany([
   { id: 'id1', status: 'processed' },
   { id: 'id2', status: 'processed' },
-  { id: 'id3', status: 'failed' }
+  { id: 'id3', status: 'failed' },
 ])
 
 console.log(`Updated ${updateResult.success}/${updateResult.total} items`)
@@ -321,16 +314,16 @@ const image = await db.insert<ImageRecord>({
   url: 'https://example.com/photo.jpg',
   title: 'Beautiful Sunset',
   tags: ['sunset', 'nature'],
-  size: 2048576
+  size: 2048576,
 })
 
 // TypeScript knows the shape of `image`
 console.log(image.createdAt) // number
-console.log(image.tags)      // string[]
+console.log(image.tags) // string[]
 ```
 
 ## 📄 License
 
 [MIT](http://opensource.org/licenses/MIT)
 
-Copyright (c) 2025 Kuingsmile
+Copyright (c) 2025-current Kuingsmile

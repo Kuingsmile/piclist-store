@@ -13,9 +13,6 @@
   "license": "MIT",
   "author": "Kuingsmile",
   "type": "module",
-  "engines": {
-    "node": "^22.13.0 || >=24.0.0"
-  },
   "exports": {
     ".": {
       "import": "./dist/index.js"
@@ -34,6 +31,7 @@
     "prepare": "husky",
     "prepublishOnly": "yarn run clean && yarn run build",
     "release": "bump-version",
+    "repro:bugs": "npm run build && node scripts/reproduce-bugs.mjs",
     "test": "node ./test_db.js"
   },
   "config": {
@@ -84,6 +82,10 @@
     "rollup-plugin-dts": "~6.4.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.70.0"
+  },
+  "packageManager": "yarn@1.22.22",
+  "engines": {
+    "node": "^22.13.0 || >=24.0.0"
   },
   "publishConfig": {
     "access": "public"
