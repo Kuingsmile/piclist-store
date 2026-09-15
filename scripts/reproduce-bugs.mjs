@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
+import { gzipSync } from 'node:zlib'
 
 const execFileAsync = promisify(execFile)
 const scriptPath = fileURLToPath(import.meta.url)
@@ -693,7 +694,7 @@ verify('08', async () => {
   assert.equal(await reopened.updateById('image', { value: 2 }), true)
   assert.throws(() => new DBStore(p, '__users_KEY__'), /reserved/)
   const invalid = file('invalid-root.db')
-  await new DBStore(invalid, 'items').getAdapter().write({ items: 'invalid' })
+  await writeFile(invalid, gzipSync(JSON.stringify({ items: 'invalid' })))
   await assert.rejects(new DBStore(invalid, 'items').get(), /Invalid database collection/)
   return { collections: ['users', 'images'], missingIndexRebuilt: true, invalidCollectionRejected: true }
 })

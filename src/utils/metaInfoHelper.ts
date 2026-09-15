@@ -1,4 +1,5 @@
 import { IInsertData, IMetaInfoMode, IObject } from '../types'
+import { validateRecord } from './validation'
 
 function metaInfoMethodWrapper(mode: IMetaInfoMode) {
   return function (_target: any, _propertyKey: string, descriptor: PropertyDescriptor) {
@@ -52,6 +53,7 @@ function generateUUID(a: any = '', b: any = ''): string {
 }
 
 function generateMetaInfo(value: IObject): IObject {
+  validateRecord(value)
   const now = Date.now()
 
   return {
@@ -63,6 +65,7 @@ function generateMetaInfo(value: IObject): IObject {
 }
 
 function updateMetaInfo(value: IObject): IObject {
+  validateRecord(value)
   return {
     ...value,
     updatedAt: Date.now(),

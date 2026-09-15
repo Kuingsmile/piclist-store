@@ -110,7 +110,7 @@ test.test('DBStore - 插入多个数据', async () => {
 test.test('DBStore - 查询数据', async () => {
   const store = new DBStore(DB_PATH, 'users')
 
-  await store.insert([
+  await store.insertMany([
     { name: 'David', age: 28 },
     { name: 'Eve', age: 32 },
   ])

@@ -34,6 +34,7 @@
     "repro:bugs": "npm run build && node scripts/reproduce-bugs.mjs",
     "test": "node ./test_db.js",
     "test:compat": "node scripts/check-compatibility.mjs",
+    "test:unit": "node --test tests/*.test.mjs",
     "test:regressions": "node scripts/reproduce-bugs.mjs --verify-fixed",
     "test:types": "tsc --ignoreConfig --noEmit --strict --module nodenext --target es2022 --skipLibCheck tests/types/consumer.ts"
   },
