@@ -139,13 +139,13 @@ class DBStore {
   }
 
   @DBStore.mutation
-  @metaInfoMethodWrapper(IMetaInfoMode.createMany)
   async insertMany<T>(value: T[]): Promise<IResult<T>[]> {
+    const results: IResult<T>[] = []
     for (const item of value) {
-      await this.insert(item, false)
+      results.push(await this.insert(item, false))
     }
     await this.db.write()
-    return value as IResult<T>[]
+    return results
   }
 
   @DBStore.mutation

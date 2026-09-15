@@ -835,6 +835,28 @@ verify('14', async () => {
   return { originalCreationTimePreserved: true, returnedRecordMatchesDisk: true, duplicateCount: 0 }
 })
 
+verify('15', async () => {
+  const db = await seed('batch-metadata-fixed.db', [{ id: 'existing', createdAt: 0, kept: true }])
+  const clock = Date.now
+  let now = 100
+  Date.now = () => ++now
+  let returned
+  try {
+    returned = await db.insertMany([{ id: 'existing', value: 1 }, { id: 'new' }])
+  } finally {
+    Date.now = clock
+  }
+  const stored = (await new DBStore(file('batch-metadata-fixed.db'), 'items').get()).data
+  assert.deepEqual(returned, stored)
+  assert.equal(returned[0].createdAt, 0)
+  assert.equal(returned[0].kept, true)
+  assert.equal(returned[1].createdAt, returned[1].updatedAt)
+  return {
+    returnedTimestamps: returned.map(item => item.updatedAt),
+    storedTimestamps: stored.map(item => item.updatedAt),
+  }
+})
+
 async function runWorker(id, parentRoot) {
   const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')
