@@ -698,6 +698,55 @@ verify('08', async () => {
   return { collections: ['users', 'images'], missingIndexRebuilt: true, invalidCollectionRejected: true }
 })
 
+verify('09', async () => {
+  const db = await seed('failed-mutation.db', [{ id: 'original', value: 1 }])
+  const adapter = db.getAdapter()
+  const write = adapter.write.bind(adapter)
+  const fail = async () => {
+    throw new Error('synthetic failure')
+  }
+  const rejectMutation = async operation => {
+    adapter.write = fail
+    try {
+      await assert.rejects(operation(), /synthetic/)
+    } finally {
+      adapter.write = write
+    }
+    assert.deepEqual(
+      (await db.get()).data.map(item => [item.id, item.value]),
+      [['original', 1]],
+    )
+  }
+  await rejectMutation(() => db.insert({ id: 'failed' }))
+  await rejectMutation(() => db.updateById('original', { value: 2 }))
+  await rejectMutation(() => db.updateMany([{ id: 'original', value: 3 }]))
+  await rejectMutation(() => db.removeById('original'))
+  await rejectMutation(() => db.overwrite([{ id: 'replacement' }]))
+  await db.insert({ id: 'ok' })
+  assert.deepEqual(
+    (await new DBStore(file('failed-mutation.db'), 'items').get()).data.map(item => item.id),
+    ['original', 'ok'],
+  )
+  const config = new JSONStore(file('failed-config.json'))
+  config.set('original', 1)
+  const jsonAdapter = config.db.adapter
+  const jsonWrite = jsonAdapter.write.bind(jsonAdapter)
+  for (const operation of [() => config.set('failed', 2), () => config.unset('original'), () => config.clear()]) {
+    jsonAdapter.write = () => {
+      throw new Error('synthetic failure')
+    }
+    try {
+      assert.throws(operation, /synthetic/)
+    } finally {
+      jsonAdapter.write = jsonWrite
+    }
+    assert.deepEqual(config.read(), { original: 1 })
+  }
+  config.set('ok', 2)
+  assert.deepEqual(new JSONStore(file('failed-config.json')).read(), { original: 1, ok: 2 })
+  return { binaryMutationsRolledBack: 5, jsonMutationsRolledBack: 3, laterCommitContainsOnlySuccessfulChanges: true }
+})
+
 async function runWorker(id, parentRoot) {
   const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')

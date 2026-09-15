@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
+
 import { Low } from 'lowdb'
 
 import { ZlibAdapter } from './adapters/ZlibAdapter'
@@ -5,11 +7,19 @@ import { IFilter, IGetResult, ILowData, ILowDataKeyMap, IMetaInfoMode, IObject, 
 import { metaInfoMethodWrapper } from './utils/metaInfoHelper'
 
 class DBStore {
+  private static mutation(_target: any, _name: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value
+    descriptor.value = function (this: DBStore, ...args: any[]) {
+      return this.mutate(() => original.apply(this, args))
+    }
+  }
   private readonly db: Low<ILowData>
   private readonly collectionName: string
   private readonly collectionKey: string
   private hasRead = false
   private reading: Promise<void> | null = null
+  private mutationQueue: Promise<void> = Promise.resolve()
+  private readonly mutationContext = new AsyncLocalStorage<boolean>()
   public errorList: (Error | string)[] = []
   private readonly adapter: ZlibAdapter
 
@@ -29,6 +39,26 @@ class DBStore {
 
   getAdapter(): ZlibAdapter {
     return this.adapter
+  }
+
+  private mutate<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.mutationContext.getStore()) return operation()
+    const pending = this.mutationQueue.then(async () => {
+      await this.read()
+      const previous = this.db.data
+      this.db.data = structuredClone(previous)
+      try {
+        return await this.mutationContext.run(true, operation)
+      } catch (error) {
+        this.db.data = previous
+        throw error
+      }
+    })
+    this.mutationQueue = pending.then(
+      () => {},
+      () => {},
+    )
+    return pending
   }
 
   async read(flush = false): Promise<ILowData | null> {
@@ -87,6 +117,7 @@ class DBStore {
     Object.defineProperty(collectionKeyMap, id, { value: 1, enumerable: true, writable: true, configurable: true })
   }
 
+  @DBStore.mutation
   @metaInfoMethodWrapper(IMetaInfoMode.create)
   async insert<T>(value: T, writable = true): Promise<IResult<T>> {
     const id = (value as IResult<T>).id
@@ -105,6 +136,7 @@ class DBStore {
     return value as IResult<T>
   }
 
+  @DBStore.mutation
   @metaInfoMethodWrapper(IMetaInfoMode.createMany)
   async insertMany<T>(value: T[]): Promise<IResult<T>[]> {
     for (const item of value) {
@@ -114,6 +146,7 @@ class DBStore {
     return value as IResult<T>[]
   }
 
+  @DBStore.mutation
   @metaInfoMethodWrapper(IMetaInfoMode.update)
   async updateById(id: string, value: IObject): Promise<boolean> {
     if (value.id !== undefined && value.id !== id) throw new Error('Record IDs cannot be changed')
@@ -130,6 +163,7 @@ class DBStore {
     }
   }
 
+  @DBStore.mutation
   @metaInfoMethodWrapper(IMetaInfoMode.updateMany)
   async updateMany(list: IObject[]): Promise<{ total: number; success: number }> {
     const collection = await this.getCollection()
@@ -156,6 +190,7 @@ class DBStore {
     return (await this.getCollection()).find(item => item.id === id) as IResult<T>
   }
 
+  @DBStore.mutation
   async removeById(id: string): Promise<void> {
     const collection = await this.getCollection()
     const collectionKeyMap = await this.getCollectionKeyMap()
@@ -167,6 +202,7 @@ class DBStore {
     }
   }
 
+  @DBStore.mutation
   async overwrite<T>(value: T[]): Promise<IResult<T>[]> {
     await this.read()
     ;(this.db.data as ILowData)[this.collectionName] = []

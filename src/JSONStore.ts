@@ -9,6 +9,12 @@ class LowWithLodash<T> extends LowSync<T> {
 }
 
 class JSONStore {
+  private static mutation(_target: any, _name: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value
+    descriptor.value = function (this: JSONStore, ...args: any[]) {
+      return this.mutate(() => original.apply(this, args))
+    }
+  }
   private readonly db: LowWithLodash<IJSON>
   private hasRead: boolean = false
 
@@ -34,6 +40,19 @@ class JSONStore {
     return this.db.chain.get(key).value()
   }
 
+  private mutate<T>(operation: () => T): T {
+    this.read()
+    const previous = this.db.data
+    this.db.data = lodash.cloneDeep(previous)
+    try {
+      return operation()
+    } catch (error) {
+      this.db.data = previous
+      throw error
+    }
+  }
+
+  @JSONStore.mutation
   set(key: string, value: any): void {
     this.read()
     this.db.chain.set(key, value).value()
@@ -44,6 +63,7 @@ class JSONStore {
     return this.db.chain.has(key).value()
   }
 
+  @JSONStore.mutation
   unset(key: string, value?: any): boolean {
     this.read()
     if (value === undefined) {
@@ -65,6 +85,7 @@ class JSONStore {
     }
   }
 
+  @JSONStore.mutation
   clear(): void {
     this.read()
     this.db.data = {}
