@@ -22,6 +22,7 @@ class DBStore<T = IObject> {
   private reading: Promise<void> | null = null
   private readonly fileKey: string
   private readonly mutationContext = new AsyncLocalStorage<boolean>()
+  private recordIndex: Map<string, IResult<IObject>> | null = null
   public errorList: (Error | string)[] = []
   private readonly adapter: ZlibAdapter
 
@@ -58,6 +59,10 @@ class DBStore<T = IObject> {
         } catch (error) {
           this.db.data = previous
           throw error
+        } finally {
+          // Public reads return live objects for compatibility. Never reuse an index
+          // after exposing these objects to callers outside the isolated mutation.
+          this.recordIndex = null
         }
       }),
     )
@@ -79,6 +84,7 @@ class DBStore<T = IObject> {
       this.reading = this.db
         .read()
         .then(() => {
+          this.recordIndex = null
           this.hasRead = true
         })
         .finally(() => {
@@ -114,6 +120,13 @@ class DBStore<T = IObject> {
     return (await this.read())?.[this.collectionName] as IResult<IObject>[]
   }
 
+  private async findRecord(id: string): Promise<IResult<IObject> | undefined> {
+    const collection = await this.getCollection()
+    if (!this.mutationContext.getStore()) return collection.find(item => item.id === id)
+    this.recordIndex ??= new Map(collection.map(item => [item.id, item]))
+    return this.recordIndex.get(id)
+  }
+
   private async getCollectionKey(id: string): Promise<1 | null> {
     const index = await this.getCollectionKeyMap()
     return Object.hasOwn(index, id) ? index[id] : null
@@ -136,13 +149,14 @@ class DBStore<T = IObject> {
     const id = (value as IResult<U>).id
     const result = await this.getCollectionKey(id)
     if (result) {
-      const item = (await this.getCollection()).find(item => item.id === id)
+      const item = await this.findRecord(id)
       if (!item) throw new Error('Database index does not match the collection')
       Object.assign(item, value, { id: item.id, createdAt: item.createdAt })
       if (writable) await this.db.write()
       return item as IResult<U>
     }
     ;(await this.getCollection()).push(value as IResult<IObject>)
+    this.recordIndex?.set(id, value as IResult<IObject>)
     await this.setCollectionKey(id)
     if (writable) {
       await this.db.write()
@@ -164,10 +178,9 @@ class DBStore<T = IObject> {
   @metaInfoMethodWrapper(IMetaInfoMode.update)
   async updateById(id: string, value: Partial<T> & IObject): Promise<boolean> {
     if (value.id !== undefined && value.id !== id) throw new Error('Record IDs cannot be changed')
-    const collection = await this.getCollection()
     const result = await this.getCollectionKey(id)
     if (result) {
-      const item = collection.find(item => item.id === id)
+      const item = await this.findRecord(id)
       if (!item) return false
       Object.assign(item, value, { id })
       await this.db.write()
@@ -180,13 +193,12 @@ class DBStore<T = IObject> {
   @DBStore.mutation
   @metaInfoMethodWrapper(IMetaInfoMode.updateMany)
   async updateMany(list: (Partial<T> & IObject)[]): Promise<{ total: number; success: number }> {
-    const collection = await this.getCollection()
     let successCount = 0
     for (const item of list) {
       if (item.id) {
         const result = await this.getCollectionKey(item.id)
         if (result) {
-          const target = collection.find(t => t.id === item.id)
+          const target = await this.findRecord(item.id)
           if (!target) continue
           Object.assign(target, item)
           successCount++
@@ -201,7 +213,7 @@ class DBStore<T = IObject> {
   }
 
   async getById<U = T>(id: string): Promise<IResult<U> | undefined> {
-    return (await this.getCollection()).find(item => item.id === id) as IResult<U> | undefined
+    return (await this.findRecord(id)) as IResult<U> | undefined
   }
 
   async count(): Promise<number> {
@@ -221,7 +233,10 @@ class DBStore<T = IObject> {
     const success = collection.length - remaining.length
     if (success > 0) {
       this.db.data[this.collectionName] = remaining
-      for (const id of requested) delete index[id]
+      for (const id of requested) {
+        delete index[id]
+        this.recordIndex?.delete(id)
+      }
       await this.db.write()
     }
     return { total: ids.length, success }
@@ -235,6 +250,7 @@ class DBStore<T = IObject> {
     if (index !== -1) {
       collection.splice(index, 1)
       delete collectionKeyMap[id]
+      this.recordIndex?.delete(id)
       await this.db.write()
     }
   }
@@ -244,6 +260,7 @@ class DBStore<T = IObject> {
     await this.read()
     ;(this.db.data as ILowData)[this.collectionName] = []
     ;(this.db.data as ILowData)[this.collectionKey] = Object.create(null)
+    this.recordIndex = null
     return await this.insertMany<U>(value)
   }
 }
