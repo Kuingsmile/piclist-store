@@ -32,7 +32,10 @@
     "prepublishOnly": "yarn run clean && yarn run build",
     "release": "bump-version",
     "repro:bugs": "npm run build && node scripts/reproduce-bugs.mjs",
-    "test": "node ./test_db.js"
+    "test": "node ./test_db.js",
+    "test:compat": "node scripts/check-compatibility.mjs",
+    "test:regressions": "node scripts/reproduce-bugs.mjs --verify-fixed",
+    "test:types": "tsc --ignoreConfig --noEmit --strict --module nodenext --target es2022 --skipLibCheck tests/types/consumer.ts"
   },
   "config": {
     "commitizen": {
@@ -80,6 +83,7 @@
     "rimraf": "^6.1.3",
     "rollup": "^4.63.2",
     "rollup-plugin-dts": "~6.4.1",
+    "store-legacy": "npm:@piclist/store@3.0.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.70.0"
   },
