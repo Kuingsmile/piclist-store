@@ -4,9 +4,11 @@ import { Low } from 'lowdb'
 
 import { ZlibAdapter } from './adapters/ZlibAdapter'
 import { IFilter, IGetResult, ILowData, ILowDataKeyMap, IMetaInfoMode, IObject, IResult } from './types'
+import { canonicalPath } from './utils/fileIdentity'
 import { metaInfoMethodWrapper } from './utils/metaInfoHelper'
 
 class DBStore {
+  private static readonly mutationQueues = new Map<string, Promise<void>>()
   private static mutation(_target: any, _name: string, descriptor: PropertyDescriptor) {
     const original = descriptor.value
     descriptor.value = function (this: DBStore, ...args: any[]) {
@@ -18,7 +20,7 @@ class DBStore {
   private readonly collectionKey: string
   private hasRead = false
   private reading: Promise<void> | null = null
-  private mutationQueue: Promise<void> = Promise.resolve()
+  private readonly fileKey: string
   private readonly mutationContext = new AsyncLocalStorage<boolean>()
   public errorList: (Error | string)[] = []
   private readonly adapter: ZlibAdapter
@@ -30,7 +32,9 @@ class DBStore {
     if (/^__.*_KEY__$/.test(collectionName)) throw new Error('Collection name is reserved for database indexes')
     this.collectionName = collectionName
     this.collectionKey = `__${collectionName}_KEY__`
-    this.adapter = new ZlibAdapter(dbPath, collectionName, this.errorList)
+    const filename = canonicalPath(dbPath)
+    this.fileKey = process.platform === 'win32' ? filename.toLowerCase() : filename
+    this.adapter = new ZlibAdapter(filename, collectionName, this.errorList)
     this.db = new Low<ILowData>(this.adapter, {
       [this.collectionName]: [],
       [this.collectionKey]: Object.create(null),
@@ -43,25 +47,33 @@ class DBStore {
 
   private mutate<T>(operation: () => Promise<T>): Promise<T> {
     if (this.mutationContext.getStore()) return operation()
-    const pending = this.mutationQueue.then(async () => {
-      await this.read()
-      const previous = this.db.data
-      this.db.data = structuredClone(previous)
-      try {
-        return await this.mutationContext.run(true, operation)
-      } catch (error) {
-        this.db.data = previous
-        throw error
-      }
-    })
-    this.mutationQueue = pending.then(
+    const previousMutation = DBStore.mutationQueues.get(this.fileKey) ?? Promise.resolve()
+    const pending = previousMutation.then(() =>
+      this.mutationContext.run(true, async () => {
+        await this.read(true)
+        const previous = this.db.data
+        this.db.data = structuredClone(previous)
+        try {
+          return await operation()
+        } catch (error) {
+          this.db.data = previous
+          throw error
+        }
+      }),
+    )
+    const settled = pending.then(
       () => {},
       () => {},
     )
+    DBStore.mutationQueues.set(this.fileKey, settled)
+    void settled.then(() => {
+      if (DBStore.mutationQueues.get(this.fileKey) === settled) DBStore.mutationQueues.delete(this.fileKey)
+    })
     return pending
   }
 
   async read(flush = false): Promise<ILowData | null> {
+    if (!this.mutationContext.getStore()) await DBStore.mutationQueues.get(this.fileKey)
     if (!this.reading && (flush || !this.hasRead)) {
       this.hasRead = false
       this.reading = this.db

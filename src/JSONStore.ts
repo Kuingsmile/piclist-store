@@ -1,3 +1,4 @@
+import json from 'comment-json'
 import lodash from 'lodash'
 import { LowSync } from 'lowdb'
 
@@ -47,9 +48,9 @@ class JSONStore {
   }
 
   private mutate<T>(operation: () => T): T {
-    this.read()
+    this.read(true)
     const previous = this.db.data
-    this.db.data = lodash.cloneDeep(previous)
+    this.db.data = json.parse(json.stringify(previous, null, 2)) as IJSON
     try {
       return operation()
     } catch (error) {

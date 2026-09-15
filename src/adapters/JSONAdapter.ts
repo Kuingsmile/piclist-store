@@ -3,18 +3,21 @@ import { TextFileSync } from 'lowdb/node'
 import writeFile from 'write-file-atomic'
 
 import { IJSON } from '../types'
+import { canonicalPath } from '../utils/fileIdentity'
 
 export class JSONAdapter {
   private readonly adapter: TextFileSync
   private readonly dbPath: string
+  private lastRead: string | null | undefined
 
   constructor(dbPath: string) {
-    this.dbPath = dbPath
-    this.adapter = new TextFileSync(dbPath)
+    this.dbPath = canonicalPath(dbPath)
+    this.adapter = new TextFileSync(this.dbPath)
   }
 
   read(): IJSON {
     const data = this.adapter.read()
+    this.lastRead = data
     if (data === null) {
       return {}
     }
@@ -37,6 +40,11 @@ export class JSONAdapter {
   }
 
   write(obj: any): void {
-    writeFile.sync(this.dbPath, json.stringify(obj, null, 2))
+    if (this.lastRead !== undefined && this.adapter.read() !== this.lastRead) {
+      throw new Error('JSON store changed since last read; reload before writing')
+    }
+    const serialized = json.stringify(obj, null, 2)
+    writeFile.sync(this.dbPath, serialized)
+    this.lastRead = serialized
   }
 }

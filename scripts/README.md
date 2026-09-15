@@ -3,12 +3,16 @@
 Run from the repository root:
 
 ```sh
-npm run repro:bugs
+yarn repro:bugs
 ```
 
 This builds the current source and executes 20 assertion-based cases covering the 15 findings from the project review.
-**CONFIRMED means the bug exists.** These checks intentionally assert the faulty behavior; a successful run is not a
-passing regression suite.
+The default mode asserts correct behavior: **FIXED means those assertions passed**, REGRESSION means an assertion
+failed, and ERROR means the case could not complete. `--verify-fixed` explicitly selects this mode.
+
+The original faulty-behavior assertions remain available with `--reproduce`. In that historical mode, CONFIRMED means
+the bug exists; an unsuccessful historical reproduction alone does not prove a fix. Use the default verification mode to
+validate the corrections.
 
 Each case prints its finding number, severity, method, expected correct behavior, and observed behavior. A separate
 child process isolates each case and limits it to 15 seconds. There are no added dependencies.
@@ -17,8 +21,9 @@ To inspect or select cases:
 
 ```sh
 node scripts/reproduce-bugs.mjs --list
-npm run repro:bugs -- --case 3
-npm run repro:bugs -- --case 03-read
+yarn repro:bugs --case 3
+yarn repro:bugs --case 03-read
+yarn repro:bugs --reproduce --case 3
 ```
 
 A finding number runs all cases for that finding. An exact case ID runs just that case. After an existing build, the
@@ -26,7 +31,7 @@ script can also run directly with Node; its imports resolve relative to the scri
 directory. Run it as a file rather than piping it through Node's --input-type=module mode, which interferes with the
 compression dependency's worker startup.
 
-| Finding | Severity    | Case IDs             | What is checked                                                                     |
+| Finding | Severity    | Case IDs             | Original bug covered                                                                |
 | ------- | ----------- | -------------------- | ----------------------------------------------------------------------------------- |
 | 1       | P1 / High   | 01                   | A delayed older write restores a deleted record on disk.                            |
 | 2       | P1 / High   | 02-db, 02-json       | Corrupt files are accepted as empty, then overwritten.                              |
@@ -53,16 +58,20 @@ contents.
 Cases 01 and 03-write pause real adapter operations with promises to make a permitted asynchronous ordering
 reproducible. They do not alter snapshots or invent filesystem results. Case 05-count wraps the real writer to count
 calls; cases 05-partial and 09 inject a write rejection. Case 15 uses an advancing Date.now test clock and restores it
-afterward. Everything else uses the public store API and synthetic file setup. These methods are also labeled in the
-console and JSON report.
+afterward. The verification for case 04-db also injects a failure to test queue recovery. Case 09 uses the JSON adapter
+to simulate synchronous write failures, and case 08 writes a legacy fixture without its index. The controlled
+verification cases release their gates even when operations correctly wait. These methods are labeled in the console and
+JSON report.
+
+Shared-file verification covers independent instances within one Node.js process. DBStore mutations use a per-file
+queue; JSONStore mutations reload synchronously. This does not provide a cross-process transaction lock. Cached reads
+can be refreshed explicitly with `read(true)`.
 
 Exit codes:
 
-- 0: Every selected case confirmed its asserted bug signature.
-- 1: At least one case did not confirm its signature, with no execution errors.
+- 0: Every selected case passed its assertions in the selected mode.
+- 1: At least one assertion failed, with no execution errors.
 - 2: Invalid arguments, worker failure, timeout, or another execution error.
 
-A non-confirmed case is not automatically proof of a fix. Check its assertions and result against the changed
-implementation. For example, a fix that serializes operations may prevent a controlled interleaving and cause its worker
-to exit or time out; this is reported as an error, never as confirmation. Some fixes deliberately reject inputs accepted
-by the old implementation, so those cases also need to be updated when converted into regression tests.
+The historical timing reproductions can time out or throw after fixes prevent their old schedules or reject invalid
+inputs. Those outcomes are never treated as successful verification.

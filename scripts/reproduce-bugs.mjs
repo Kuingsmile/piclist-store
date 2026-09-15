@@ -1,4 +1,4 @@
-// Reproduction harness: CONFIRMED means the bug is present, not that the implementation is correct.
+// FIXED requires assertions of correct behavior. --reproduce checks the original bug signatures.
 // Run npm run repro:bugs to build first. See scripts/README.md for exit codes and case selection.
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
@@ -14,7 +14,7 @@ const scriptPath = fileURLToPath(import.meta.url)
 const caseTimeoutMs = 15_000
 const cases = new Map()
 const fixes = new Map()
-let verifyFixed = false
+let verifyFixed = true
 let root
 let DBStore
 let JSONStore
@@ -857,6 +857,73 @@ verify('15', async () => {
   }
 })
 
+verify('04-db', async () => {
+  const p = file('shared.db')
+  const first = await seed('shared.db', [])
+  const second = new DBStore(p, 'items')
+  await second.read()
+  await first.insert({ id: 'a' })
+  await second.insert({ id: 'b' })
+  assert.deepEqual(
+    (await new DBStore(p, 'items').get()).data.map(item => item.id),
+    ['a', 'b'],
+  )
+  // Exercise overlapping writes through independent adapters, including failure recovery.
+  const third = new DBStore(join(root, '.', 'shared.db'), 'items')
+  await Promise.all(
+    Array.from({ length: 12 }, (_, index) => [first, second, third][index % 3].insert({ id: 'concurrent-' + index })),
+  )
+  assert.equal((await new DBStore(p, 'items').get()).total, 14)
+  await Promise.all([first.insert({ id: 'same', value: 1 }), second.insert({ id: 'same', value: 2 })])
+  assert.equal((await new DBStore(p, 'items').get()).total, 15)
+  const images = new DBStore(p, 'images')
+  await Promise.all([first.insert({ id: 'last' }), images.insert({ id: 'image' })])
+  assert.equal((await new DBStore(p, 'items').get()).total, 16)
+  assert.equal((await new DBStore(p, 'images').get()).total, 1)
+  const adapter = second.getAdapter()
+  const write = adapter.write.bind(adapter)
+  adapter.write = async () => {
+    throw new Error('synthetic failure')
+  }
+  await assert.rejects(second.insert({ id: 'failed' }), /synthetic/)
+  adapter.write = write
+  await first.insert({ id: 'recovered' })
+  const snapshot = await new DBStore(p, 'items').get()
+  assert.equal(snapshot.total, 17)
+  assert(!snapshot.data.some(item => item.id === 'failed'))
+  return {
+    sequentialWritesPreserved: true,
+    concurrentWrites: 12,
+    collectionsPreserved: 2,
+    queueRecoveredAfterFailure: true,
+  }
+})
+verify('04-json', async () => {
+  const p = file('shared.json')
+  await writeFile(p, '{\n  // Preserve this comment\n  "saved": 1\n}\n')
+  const first = new JSONStore(p)
+  const second = new JSONStore(p)
+  first.set('a', 1)
+  second.set('b', 2)
+  const reopened = new JSONStore(p)
+  assert.equal(reopened.get('a'), 1)
+  assert.equal(reopened.get('b'), 2)
+  assert((await readFile(p, 'utf8')).includes('// Preserve this comment'))
+  // An explicit write of a stale snapshot must reject instead of erasing newer values.
+  const stale = new JSONStore(p)
+  first.set('newer', 3)
+  stale.read().local = 4
+  assert.throws(() => stale.write(), /changed since last read/)
+  second.unset('a')
+  first.set('last', 5)
+  const final = new JSONStore(p)
+  assert.equal(final.has('a'), false)
+  assert.equal(final.get('b'), 2)
+  assert.equal(final.get('newer'), 3)
+  assert.equal(final.get('last'), 5)
+  return { sharedKeysPreserved: true, commentsPreserved: true, staleExplicitWriteRejected: true }
+})
+
 async function runWorker(id, parentRoot) {
   const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')
@@ -870,10 +937,12 @@ async function runWorker(id, parentRoot) {
     // Never forward arbitrary library diagnostics or file contents.
     process.stdout.write(
       JSON.stringify({
-        status: error instanceof assert.AssertionError ? 'NOT CONFIRMED' : 'ERROR',
+        status: error instanceof assert.AssertionError ? (verifyFixed ? 'REGRESSION' : 'NOT CONFIRMED') : 'ERROR',
         reason:
           error instanceof assert.AssertionError
-            ? 'The observed behavior did not match the asserted bug signature.'
+            ? verifyFixed
+              ? 'An assertion of correct behavior failed.'
+              : 'The observed behavior did not match the asserted bug signature.'
             : 'The case threw before it could confirm the bug.',
         errorType: error.name,
         errorCode: error.code,
@@ -895,7 +964,7 @@ async function runIsolated(meta, parentRoot) {
   try {
     const { stdout } = await execFileAsync(
       process.execPath,
-      [scriptPath, '--worker', meta.id, parentRoot, ...(verifyFixed ? ['--verify-fixed'] : [])],
+      [scriptPath, '--worker', meta.id, parentRoot, verifyFixed ? '--verify-fixed' : '--reproduce'],
       {
         timeout: caseTimeoutMs,
         killSignal: 'SIGKILL',
@@ -904,7 +973,10 @@ async function runIsolated(meta, parentRoot) {
       },
     )
     const result = JSON.parse(stdout)
-    assert(['FIXED', 'CONFIRMED', 'NOT CONFIRMED', 'ERROR'].includes(result.status), 'Invalid worker result')
+    assert(
+      ['FIXED', 'CONFIRMED', 'REGRESSION', 'NOT CONFIRMED', 'ERROR'].includes(result.status),
+      'Invalid worker result',
+    )
     return { ...meta, ...result }
   } catch (error) {
     return {
@@ -919,10 +991,10 @@ async function runIsolated(meta, parentRoot) {
 }
 
 function help() {
-  console.log('Add --verify-fixed to assert correct behavior after fixes.')
+  console.log('Checks correct behavior by default (--verify-fixed). Use --reproduce for historical bug signatures.')
   console.log('Usage: npm run repro:bugs [-- --case <finding number or exact case ID>]')
   console.log('       node scripts/reproduce-bugs.mjs --list')
-  console.log('CONFIRMED means the bug is present. Exit 0: all selected bugs confirmed; 1: not confirmed; 2: error.')
+  console.log('Exit 0: all selected checks pass; 1: an assertion fails; 2: execution or argument error.')
   console.log('Each run preserves fresh synthetic fixtures and results.json in a new system temporary directory.')
 }
 
@@ -972,7 +1044,9 @@ async function main(args) {
   const confirmed = results.filter(result => result.status === (verifyFixed ? 'FIXED' : 'CONFIRMED')).length
   const errors = results.filter(result => result.status === 'ERROR').length
   const summary = {
-    confirmed,
+    mode: verifyFixed ? 'verify-fixed' : 'reproduce',
+    fixed: verifyFixed ? confirmed : 0,
+    confirmed: verifyFixed ? 0 : confirmed,
     notConfirmed: results.length - confirmed - errors,
     errors,
     total: results.length,
@@ -989,15 +1063,18 @@ async function main(args) {
       summary.findingsCovered +
       ' findings.',
   )
-  console.log('Not confirmed: ' + summary.notConfirmed + '; errors: ' + summary.errors)
+  console.log(
+    (verifyFixed ? 'Regressions: ' : 'Not confirmed: ') + summary.notConfirmed + '; errors: ' + summary.errors,
+  )
   console.log('Fixtures and JSON report: ' + reportPath)
   process.exitCode = errors ? 2 : summary.notConfirmed ? 1 : 0
 }
 
 try {
   const input = process.argv.slice(2)
-  verifyFixed = input.includes('--verify-fixed')
-  const args = input.filter(arg => arg !== '--verify-fixed')
+  if (input.includes('--verify-fixed') && input.includes('--reproduce')) throw new Error('Conflicting modes')
+  verifyFixed = !input.includes('--reproduce')
+  const args = input.filter(arg => arg !== '--verify-fixed' && arg !== '--reproduce')
   if (args.length === 3 && args[0] === '--worker') {
     await runWorker(args[1], args[2])
   } else {
