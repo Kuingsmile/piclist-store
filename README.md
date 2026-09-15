@@ -243,6 +243,21 @@ config.write() // Persist changes
 
 ## 🔧 Advanced Usage
 
+### Refresh and concurrent access
+
+Reads are cached per instance. Use `await db.refresh()` or `config.refresh()` to see changes made by another
+instance or process; these are aliases for `read(true)`. Refresh discards unsaved changes made through returned
+objects. DBStore reads remain asynchronous; JSONStore reads, writes, and refresh remain synchronous.
+
+Mutations reload the latest file before changing it. DBStore serializes mutations to the same canonical file path
+within one Node.js process; JSONStore mutations run synchronously and explicit `write()` rejects a stale snapshot.
+These guarantees do not provide a cross-process transaction lock. Applications with several processes should route
+writes through one owning process. Atomic file replacement prevents partial files but does not merge simultaneous
+writes from independent processes.
+
+Returned records retain the existing live-object behavior. Use the update methods to persist changes, rather than
+editing returned objects and assuming those edits will be saved by a later mutation.
+
 ### Custom Filtering
 
 ```typescript

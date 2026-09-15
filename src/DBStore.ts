@@ -116,6 +116,11 @@ class DBStore<T = IObject> {
     }
   }
 
+  /** Reload the file after changes by another store or process. */
+  async refresh(): Promise<ILowData | null> {
+    return this.read(true)
+  }
+
   private async getCollection(): Promise<IResult<IObject>[]> {
     return (await this.read())?.[this.collectionName] as IResult<IObject>[]
   }

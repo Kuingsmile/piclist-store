@@ -46,6 +46,11 @@ class JSONStore<T extends object = IJSON> {
     return this.db.chain.get(key, defaultValue).value()
   }
 
+  /** Reload the file, discarding unsaved edits made through returned objects. */
+  refresh(): T {
+    return this.read(true)
+  }
+
   write(): void {
     this.read()
     this.db.write()
