@@ -43,7 +43,30 @@ class ZlibAdapter {
       const buffer = await fs.readFile(this.dbPath)
       const decompressedData = await this.gunzipAsync(buffer)
       const str = strFromU8(decompressedData)
-      return JSON.parse(str)
+      const data = JSON.parse(str)
+      if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid database root')
+      const collection = Object.hasOwn(data, this.collectionName) ? data[this.collectionName] : []
+      if (!Array.isArray(collection)) throw new Error('Invalid database collection')
+      const index = Object.create(null)
+      for (const item of collection) {
+        if (!item || typeof item.id !== 'string' || !item.id || Object.hasOwn(index, item.id)) {
+          throw new Error('Invalid or duplicate database record ID')
+        }
+        index[item.id] = 1
+      }
+      Object.defineProperty(data, this.collectionName, {
+        value: collection,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      })
+      Object.defineProperty(data, `__${this.collectionName}_KEY__`, {
+        value: index,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      })
+      return data
     } catch (err: any) {
       this.handleError(err)
       throw err

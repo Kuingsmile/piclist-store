@@ -17,6 +17,7 @@ class DBStore {
     if (!dbPath || !collectionName) {
       throw Error('Please provide valid dbPath or collectionName')
     }
+    if (/^__.*_KEY__$/.test(collectionName)) throw new Error('Collection name is reserved for database indexes')
     this.collectionName = collectionName
     this.collectionKey = `__${collectionName}_KEY__`
     this.adapter = new ZlibAdapter(dbPath, collectionName, this.errorList)

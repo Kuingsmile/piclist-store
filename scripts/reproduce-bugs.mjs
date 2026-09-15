@@ -677,6 +677,27 @@ verify('07', async () => {
   return { persistedSpecialIds: ids, missingUpdateReturned: false }
 })
 
+verify('08', async () => {
+  const p = file('collections-fixed.db')
+  await new DBStore(p, 'users').insert({ id: 'user' })
+  const images = new DBStore(p, 'images')
+  assert.equal((await images.get()).total, 0)
+  await images.insert({ id: 'image' })
+  assert.equal((await new DBStore(p, 'users').get()).total, 1)
+  assert.equal((await new DBStore(p, 'images').get()).total, 1)
+  // Legacy records remain usable even when their auxiliary ID index is absent.
+  const data = await images.getAdapter().read()
+  delete data.__images_KEY__
+  await images.getAdapter().write(data)
+  const reopened = new DBStore(p, 'images')
+  assert.equal(await reopened.updateById('image', { value: 2 }), true)
+  assert.throws(() => new DBStore(p, '__users_KEY__'), /reserved/)
+  const invalid = file('invalid-root.db')
+  await new DBStore(invalid, 'items').getAdapter().write({ items: 'invalid' })
+  await assert.rejects(new DBStore(invalid, 'items').get(), /Invalid database collection/)
+  return { collections: ['users', 'images'], missingIndexRebuilt: true, invalidCollectionRejected: true }
+})
+
 async function runWorker(id, parentRoot) {
   const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')
