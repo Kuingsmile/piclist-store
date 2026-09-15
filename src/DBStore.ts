@@ -7,7 +7,7 @@ import { IFilter, IGetResult, ILowData, ILowDataKeyMap, IMetaInfoMode, IObject, 
 import { canonicalPath } from './utils/fileIdentity'
 import { metaInfoMethodWrapper } from './utils/metaInfoHelper'
 
-class DBStore {
+class DBStore<T = IObject> {
   private static readonly mutationQueues = new Map<string, Promise<void>>()
   private static mutation(_target: any, _name: string, descriptor: PropertyDescriptor) {
     const original = descriptor.value
@@ -89,7 +89,7 @@ class DBStore {
     return this.db.data
   }
 
-  async get(filter?: IFilter): Promise<IGetResult<IObject>> {
+  async get(filter?: IFilter): Promise<IGetResult<T>> {
     let data: IResult<IObject>[] = (await this.getCollection()).slice()
     const total = data.length
     if (filter !== undefined) {
@@ -106,7 +106,7 @@ class DBStore {
     }
     return {
       total,
-      data,
+      data: data as IResult<T>[],
     }
   }
 
@@ -132,27 +132,27 @@ class DBStore {
 
   @DBStore.mutation
   @metaInfoMethodWrapper(IMetaInfoMode.create)
-  async insert<T>(value: T, writable = true): Promise<IResult<T>> {
-    const id = (value as IResult<T>).id
+  async insert<U extends T = T>(value: U, writable = true): Promise<IResult<U>> {
+    const id = (value as IResult<U>).id
     const result = await this.getCollectionKey(id)
     if (result) {
       const item = (await this.getCollection()).find(item => item.id === id)
       if (!item) throw new Error('Database index does not match the collection')
       Object.assign(item, value, { id: item.id, createdAt: item.createdAt })
       if (writable) await this.db.write()
-      return item as IResult<T>
+      return item as IResult<U>
     }
-    ;(await this.getCollection()).push(value as IResult<T>)
+    ;(await this.getCollection()).push(value as IResult<IObject>)
     await this.setCollectionKey(id)
     if (writable) {
       await this.db.write()
     }
-    return value as IResult<T>
+    return value as IResult<U>
   }
 
   @DBStore.mutation
-  async insertMany<T>(value: T[]): Promise<IResult<T>[]> {
-    const results: IResult<T>[] = []
+  async insertMany<U extends T = T>(value: U[]): Promise<IResult<U>[]> {
+    const results: IResult<U>[] = []
     for (const item of value) {
       results.push(await this.insert(item, false))
     }
@@ -162,7 +162,7 @@ class DBStore {
 
   @DBStore.mutation
   @metaInfoMethodWrapper(IMetaInfoMode.update)
-  async updateById(id: string, value: IObject): Promise<boolean> {
+  async updateById(id: string, value: Partial<T> & IObject): Promise<boolean> {
     if (value.id !== undefined && value.id !== id) throw new Error('Record IDs cannot be changed')
     const collection = await this.getCollection()
     const result = await this.getCollectionKey(id)
@@ -179,7 +179,7 @@ class DBStore {
 
   @DBStore.mutation
   @metaInfoMethodWrapper(IMetaInfoMode.updateMany)
-  async updateMany(list: IObject[]): Promise<{ total: number; success: number }> {
+  async updateMany(list: (Partial<T> & IObject)[]): Promise<{ total: number; success: number }> {
     const collection = await this.getCollection()
     let successCount = 0
     for (const item of list) {
@@ -200,8 +200,8 @@ class DBStore {
     }
   }
 
-  async getById<T>(id: string): Promise<IResult<T> | undefined> {
-    return (await this.getCollection()).find(item => item.id === id) as IResult<T>
+  async getById<U = T>(id: string): Promise<IResult<U> | undefined> {
+    return (await this.getCollection()).find(item => item.id === id) as IResult<U> | undefined
   }
 
   @DBStore.mutation
@@ -217,11 +217,11 @@ class DBStore {
   }
 
   @DBStore.mutation
-  async overwrite<T>(value: T[]): Promise<IResult<T>[]> {
+  async overwrite<U extends T = T>(value: U[]): Promise<IResult<U>[]> {
     await this.read()
     ;(this.db.data as ILowData)[this.collectionName] = []
     ;(this.db.data as ILowData)[this.collectionKey] = Object.create(null)
-    return await this.insertMany<T>(value)
+    return await this.insertMany<U>(value)
   }
 }
 

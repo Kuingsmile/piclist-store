@@ -29,16 +29,20 @@ export enum IMetaInfoMode {
   updateMany,
 }
 
-export type IResult<T> = T & {
+export interface IMetaInfo {
   id: string
   createdAt: number
   updatedAt: number
 }
+
+export type IResult<T> = T & IMetaInfo
 
 export type ILowData = Record<string, IObject[] | ILowDataKeyMap>
 
 export type ILowDataKeyMap = Record<string, 1>
 
 export interface IJSON {
-  [propsName: string]: string | number | IJSON
+  [propsName: string]: JSONValue
 }
+
+export type JSONValue = string | number | boolean | null | IJSON | JSONValue[]
