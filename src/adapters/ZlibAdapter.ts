@@ -30,7 +30,7 @@ class ZlibAdapter {
     this.readCount++
     const defaultData = {
       [this.collectionName]: [],
-      [`__${this.collectionName}_KEY__`]: {},
+      [`__${this.collectionName}_KEY__`]: Object.create(null),
     }
 
     try {

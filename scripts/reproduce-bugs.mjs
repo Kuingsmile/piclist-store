@@ -661,6 +661,22 @@ verify('06', async () => {
   return { renameRejected: true, originalIdUsable: true, uniqueIds: ['a', 'b'] }
 })
 
+verify('07', async () => {
+  const db = await seed('special-ids.db', [])
+  assert.equal(await db.updateById('constructor', { value: 1 }), false)
+  const ids = ['toString', 'constructor', '__proto__', 'hasOwnProperty']
+  await db.insertMany(ids.map(id => ({ id, value: 1 })))
+  const reopened = new DBStore(file('special-ids.db'), 'items')
+  assert.equal((await reopened.get()).total, ids.length)
+  for (const id of ids) {
+    assert.equal(await reopened.updateById(id, { value: 2 }), true)
+    assert.equal((await reopened.getById(id)).value, 2)
+  }
+  await reopened.removeById('__proto__')
+  assert.equal(await reopened.getById('__proto__'), undefined)
+  return { persistedSpecialIds: ids, missingUpdateReturned: false }
+})
+
 async function runWorker(id, parentRoot) {
   const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')

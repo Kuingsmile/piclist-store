@@ -22,7 +22,7 @@ class DBStore {
     this.adapter = new ZlibAdapter(dbPath, collectionName, this.errorList)
     this.db = new Low<ILowData>(this.adapter, {
       [this.collectionName]: [],
-      [this.collectionKey]: {},
+      [this.collectionKey]: Object.create(null),
     })
   }
 
@@ -71,7 +71,8 @@ class DBStore {
   }
 
   private async getCollectionKey(id: string): Promise<1 | null> {
-    return (await this.getCollectionKeyMap())[id]
+    const index = await this.getCollectionKeyMap()
+    return Object.hasOwn(index, id) ? index[id] : null
   }
 
   private async getCollectionKeyMap(): Promise<ILowDataKeyMap> {
@@ -82,7 +83,7 @@ class DBStore {
     await this.read()
     const data = this.db.data!
     const collectionKeyMap = data[this.collectionKey] as ILowDataKeyMap
-    collectionKeyMap[id] = 1
+    Object.defineProperty(collectionKeyMap, id, { value: 1, enumerable: true, writable: true, configurable: true })
   }
 
   @metaInfoMethodWrapper(IMetaInfoMode.create)
@@ -168,7 +169,7 @@ class DBStore {
   async overwrite<T>(value: T[]): Promise<IResult<T>[]> {
     await this.read()
     ;(this.db.data as ILowData)[this.collectionName] = []
-    ;(this.db.data as ILowData)[this.collectionKey] = {}
+    ;(this.db.data as ILowData)[this.collectionKey] = Object.create(null)
     return await this.insertMany<T>(value)
   }
 }
