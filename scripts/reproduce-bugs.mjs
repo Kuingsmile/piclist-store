@@ -766,6 +766,29 @@ verify('10-default', async () => {
   return { missingFallback: 'light', falsyValuesPreserved: true }
 })
 
+verify('11', async () => {
+  const db = await seed('chronology.db', [
+    { id: 'newer', createdAt: 200 },
+    { id: 'older', createdAt: 100 },
+    { id: 'same-time', createdAt: 100 },
+  ])
+  const asc = (await db.get({ orderBy: 'asc' })).data.map(item => item.id)
+  const desc = (await db.get({ orderBy: 'desc' })).data.map(item => item.id)
+  assert.deepEqual(asc, ['older', 'same-time', 'newer'])
+  assert.deepEqual(desc, ['newer', 'older', 'same-time'])
+  const page = await db.get({ orderBy: 'asc', offset: 1, limit: 1 })
+  assert.equal(page.total, 3)
+  assert.deepEqual(
+    page.data.map(item => item.id),
+    ['same-time'],
+  )
+  assert.deepEqual(
+    (await db.get()).data.map(item => item.id),
+    ['newer', 'older', 'same-time'],
+  )
+  return { ascending: asc, descending: desc, paginationUsesSortedOrder: true }
+})
+
 async function runWorker(id, parentRoot) {
   const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')

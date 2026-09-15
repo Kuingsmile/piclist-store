@@ -81,8 +81,9 @@ class DBStore {
     let data: IResult<IObject>[] = (await this.getCollection()).slice()
     const total = data.length
     if (filter !== undefined) {
-      if (filter.orderBy === 'desc') {
-        data = data.reverse()
+      if (filter.orderBy === 'asc' || filter.orderBy === 'desc') {
+        const direction = filter.orderBy === 'desc' ? -1 : 1
+        data.sort((left, right) => direction * (left.createdAt - right.createdAt))
       }
       if (typeof filter.offset === 'number' && filter.offset >= 0) {
         data = data.slice(filter.offset)
