@@ -90,7 +90,9 @@ class DBStore {
     const id = (value as IResult<T>).id
     const result = await this.getCollectionKey(id)
     if (result) {
-      await this.updateById(id, value as IObject)
+      const item = (await this.getCollection()).find(item => item.id === id)
+      if (item) Object.assign(item, value)
+      if (writable) await this.db.write()
       return value as IResult<T>
     }
     ;(await this.getCollection()).push(value as IResult<T>)

@@ -610,6 +610,41 @@ verify('03-write', async () => {
   return { waitedForInitialization: true, persistedIds: ids }
 })
 
+verify('05-count', async () => {
+  const db = await seed('batch-count.db', [{ id: 'existing', value: 0 }])
+  const adapter = db.getAdapter()
+  const write = adapter.write.bind(adapter)
+  let writes = 0
+  adapter.write = async data => {
+    writes++
+    return write(data)
+  }
+  await db.insertMany([{ id: 'existing', value: 1 }, { id: 'b' }, { id: 'c' }])
+  assert.equal(writes, 1)
+  const reopened = await new DBStore(file('batch-count.db'), 'items').get()
+  assert.equal(reopened.total, 3)
+  assert.equal(reopened.data.find(item => item.id === 'existing').value, 1)
+  return { items: 3, writes }
+})
+verify('05-partial', async () => {
+  const db = await seed('batch-rollback.db', [{ id: 'original' }])
+  const before = await readFile(file('batch-rollback.db'))
+  const adapter = db.getAdapter()
+  const write = adapter.write.bind(adapter)
+  let writes = 0
+  adapter.write = async () => {
+    writes++
+    throw new Error('synthetic commit failure')
+  }
+  await assert.rejects(db.overwrite([{ id: 'a' }, { id: 'b' }, { id: 'c' }]), /synthetic/)
+  assert.equal(writes, 1)
+  assert.deepEqual(await readFile(file('batch-rollback.db')), before)
+  adapter.write = write
+  await db.overwrite([{ id: 'a' }, { id: 'b' }, { id: 'c' }])
+  assert.equal((await new DBStore(file('batch-rollback.db'), 'items').get()).total, 3)
+  return { failedBatchWrites: writes, originalFilePreservedOnFailure: true, retryCount: 3 }
+})
+
 async function runWorker(id, parentRoot) {
   const run = (verifyFixed ? fixes : cases).get(id)
   assert(run, 'Unknown worker case ID')

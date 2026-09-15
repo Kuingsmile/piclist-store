@@ -22,7 +22,7 @@ function transformArgumentsByMode(mode: IMetaInfoMode, args: IInsertData): IInse
 
     case IMetaInfoMode.create: {
       const item = args[0] as IObject
-      return [generateMetaInfo(item)]
+      return [generateMetaInfo(item), args[1] as boolean | undefined]
     }
 
     case IMetaInfoMode.updateMany: {

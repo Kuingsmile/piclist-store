@@ -20,7 +20,7 @@ export interface IObject {
   [propName: string]: any
 }
 
-export type IInsertData = IObject[] | [string, IObject] | [IObject[]]
+export type IInsertData = IObject[] | [string, IObject] | [IObject[]] | [IObject, boolean?]
 
 export enum IMetaInfoMode {
   createMany,
