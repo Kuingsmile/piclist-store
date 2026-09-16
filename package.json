@@ -29,7 +29,7 @@
     "License"
   ],
   "scripts": {
-    "benchmark": "node scripts/benchmark.mjs",
+    "benchmark": "rollup -c --forceExit && node scripts/benchmark.mjs",
     "build": "rollup -c",
     "clean": "rimraf dist",
     "cz": "git-cz",
@@ -43,9 +43,9 @@
     "test": "node ./test_db.js",
     "test:compat": "node scripts/check-compatibility.mjs",
     "test:package": "node scripts/check-package.mjs",
-    "test:unit": "node --test tests/*.test.mjs",
     "test:regressions": "node scripts/reproduce-bugs.mjs --verify-fixed",
-    "test:types": "tsc --ignoreConfig --noEmit --strict --module nodenext --target es2022 --skipLibCheck tests/types/consumer.ts"
+    "test:types": "tsc --ignoreConfig --noEmit --strict --module nodenext --target es2022 --skipLibCheck tests/types/consumer.ts",
+    "test:unit": "node --test tests/*.test.mjs"
   },
   "config": {
     "commitizen": {

@@ -1,3 +1,41 @@
+# Benchmarks
+
+```sh
+yarn benchmark
+yarn benchmark 1000 10000 --runs 3
+yarn benchmark 100 --json
+```
+
+The command builds current source before comparing it with published `3.0.1`. After building, run
+`node scripts/benchmark.mjs` directly to skip the build. Sizes must be integers from 1 to 100,000; the default is 1,000
+and 10,000. `--runs` accepts 1 to 20 and defaults to 1. `--help` lists the options.
+
+Each store and dataset size gets a table with the operation, work per run, legacy milliseconds, current milliseconds,
+and a relative faster/slower label. Times cover the entire workload in the row, not the average per call. With multiple
+runs, each column reports its median and the comparison is the ratio of those medians. Lower milliseconds are better.
+`--json` emits one JSON object per store/size with numeric timings and `speedup = legacyMs / currentMs` (above 1 means
+current is faster). Use the direct Node command for JSON output without package-manager/build messages.
+
+- **DBStore:** opening/reading, cached reads, successful and missing ID lookups, sorted pagination, count/existence
+  queries, forced reloads, single and batch inserts/updates/deletes, and overwrites.
+- **JSONStore:** opening/reading, cached get/has, forced reloads, single and batch sets, unset, and clear.
+- Rows marked `*` compare newer APIs with equivalent legacy operations: `count()` versus `get().total`, `hasById()`
+  versus `Boolean(getById())`, `removeMany()` versus sequential `removeById()`, and `setMany()` versus sequential
+  `set()`. These measure equivalent final results; sequential legacy writes do not have the current batch atomicity
+  guarantees.
+
+Cached read workloads run 100 calls. Insert/remove/set batches and overwrite replacement lists contain at most 25
+records/keys to bound legacy full-file writes. `updateMany()` updates the whole dataset. Overwrite starts with the full
+dataset and replaces it with the bounded replacement list. DB fixtures are ordered by creation time so legacy reverse
+ordering and current timestamp sorting return identical pages; this does not compare arbitrary unsorted input.
+
+Every measurement starts from the same synthetic fixture. Repeated runs alternate version order. Fixture creation,
+loading for warm operations, assertions, and reopening to verify persisted mutations are excluded from timings. Opening
+includes construction and the initial read, but does not flush the operating system's filesystem cache. Timings include
+each version's validation and persistence behavior; no performance threshold is asserted. These are local measurements
+affected by startup, JIT, garbage collection, filesystem caching, and machine load. Use repeated runs for a more
+representative comparison. Temporary fixtures are removed even if a check fails.
+
 # Bug reproductions
 
 Run from the repository root:

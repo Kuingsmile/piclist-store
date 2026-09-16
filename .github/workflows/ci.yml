@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
@@ -13,12 +14,13 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         node: ['22.13.0', '24.0.0', '22.x', '24.x', 'node']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
       - run: npm install --global yarn@1.22.22
       - run: yarn install --frozen-lockfile
+      - run: yarn run benchmark 10000 100000 --runs 3
       - run: yarn lint:check
       - run: yarn build
       - run: yarn test

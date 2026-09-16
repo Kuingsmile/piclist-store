@@ -425,8 +425,11 @@ and `yarn test:package`. `yarn lint:check` checks formatting without changing fi
 
 `yarn test:compat --json path/to/data.json --db path/to/piclist.db` additionally checks temporary copies of existing
 files against the published `3.0.1` package. It suppresses file contents and verifies that originals remain unchanged.
-`yarn benchmark` measures full-file reads and batch updates on synthetic 1,000- and 10,000-record datasets; supply other
-sizes as arguments. Mutation lookups use a temporary ID map. Public reads keep their existing live-object behavior, so
+`yarn benchmark` builds the current source and compares DBStore and JSONStore operations against published `3.0.1` on
+synthetic 1,000- and 10,000-record datasets. Tables show timings side by side, workload counts, and how much faster or
+slower the current version is. Supply other sizes as arguments, use `--runs 3` for median timings across three runs, or
+`--json` for machine-readable results. See [benchmark details](scripts/README.md#benchmarks) for coverage and timing
+methodology. Mutation lookups use a temporary ID map. Public reads keep their existing live-object behavior, so
 individual `getById()` calls still scan the collection.
 
 ## 📄 License
