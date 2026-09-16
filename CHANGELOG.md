@@ -1,3 +1,41 @@
+# :tada: 4.0.0 (2026-09-16)
+
+### :sparkles: Features
+
+* add atomic settings and removal batches with lookup helpers ([df4837b](https://github.com/Kuingsmile/piclist-store/commit/df4837b))
+* add explicit refresh APIs and document concurrency guarantees ([39642fd](https://github.com/Kuingsmile/piclist-store/commit/39642fd))
+* infer collection and configuration types while preserving legacy calls ([ef5144e](https://github.com/Kuingsmile/piclist-store/commit/ef5144e))
+
+### :bug: Bug Fixes
+
+* coordinate shared-file mutations and reject stale snapshots ([1426db4](https://github.com/Kuingsmile/piclist-store/commit/1426db4))
+* generate batch metadata once and return committed records ([27f5304](https://github.com/Kuingsmile/piclist-store/commit/27f5304))
+* handle prototype names as ordinary record identifiers ([d749d6e](https://github.com/Kuingsmile/piclist-store/commit/d749d6e))
+* implement documented JSON write and default lookup APIs ([b69fe97](https://github.com/Kuingsmile/piclist-store/commit/b69fe97))
+* initialize missing collections and rebuild record indexes ([8942df2](https://github.com/Kuingsmile/piclist-store/commit/8942df2))
+* keep record identifiers immutable during updates ([cb60cd2](https://github.com/Kuingsmile/piclist-store/commit/cb60cd2))
+* persist batch inserts and replacements in one write ([a1802e1](https://github.com/Kuingsmile/piclist-store/commit/a1802e1))
+* preserve creation metadata and return merged upsert records ([f279510](https://github.com/Kuingsmile/piclist-store/commit/f279510))
+* preserve permissive JSON access for existing untyped consumers ([299d8e0](https://github.com/Kuingsmile/piclist-store/commit/299d8e0))
+* reject unreadable stores and preserve original files ([c7be3de](https://github.com/Kuingsmile/piclist-store/commit/c7be3de))
+* reject unsupported JSON roots before configuration writes ([e924d8b](https://github.com/Kuingsmile/piclist-store/commit/e924d8b))
+* remove bracket paths and array entries consistently ([612fa17](https://github.com/Kuingsmile/piclist-store/commit/612fa17))
+* roll back failed mutations and serialize transaction recovery ([6a11f2c](https://github.com/Kuingsmile/piclist-store/commit/6a11f2c))
+* serialize compressed writes to preserve persistence order ([0b4f5cc](https://github.com/Kuingsmile/piclist-store/commit/0b4f5cc))
+* share pending initialization across database callers ([33a1114](https://github.com/Kuingsmile/piclist-store/commit/33a1114))
+* sort records by creation time before pagination ([3efbc27](https://github.com/Kuingsmile/piclist-store/commit/3efbc27))
+* validate records before committing and expose safe store errors ([ba265a1](https://github.com/Kuingsmile/piclist-store/commit/ba265a1))
+
+### :package: Chore
+
+* preserve bug reproduction baseline ([c281a86](https://github.com/Kuingsmile/piclist-store/commit/c281a86))
+* publish only runtime artifacts and verify packed consumers ([25de24a](https://github.com/Kuingsmile/piclist-store/commit/25de24a))
+* update ci ([6eea742](https://github.com/Kuingsmile/piclist-store/commit/6eea742))
+* update eslint and bump-version ([f12fb6a](https://github.com/Kuingsmile/piclist-store/commit/f12fb6a))
+
+### :zap: Performance Improvements
+
+* index batch mutations without changing live read behavior ([2ca901f](https://github.com/Kuingsmile/piclist-store/commit/2ca901f))
 ##  (2026-01-09)
 
 * :arrow_up: Upgrade(custom): upgrade deps d0e60fe

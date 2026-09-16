@@ -1,6 +1,6 @@
 {
   "name": "@piclist/store",
-  "version": "3.0.1",
+  "version": "4.0.0",
   "description": "A  simple and efficient key-value store for piclist, supporting JSON and binary data.",
   "homepage": "https://github.com/Kuingsmile/piclist-store#readme",
   "bugs": {
